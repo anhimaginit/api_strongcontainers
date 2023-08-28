@@ -1,0 +1,36 @@
+<?php
+$origin=isset($_SERVER['HTTP_ORIGIN'])?$_SERVER['HTTP_ORIGIN']:$_SERVER['HTTP_HOST'];
+header('Access-Control-Allow-Origin: '.$origin);
+header('Access-Control-Allow-Methods: POST, OPTIONS, GET, PUT');
+header('Access-Control-Allow-Credentials: true');
+
+    include_once './lib/class.products.php';
+
+    $Object = new Products();
+    $EXPECTED = array('token');
+
+    foreach ($EXPECTED AS $key) {
+        if (!empty($_POST[$key])){
+            ${$key} = $Object->protect($_POST[$key]);
+        } else {
+            ${$key} = NULL;
+        }
+    }
+
+    $isAuth =$Object->basicAuth($token);
+    if(!$isAuth){
+        $ret = array('ERROR'=>'Authentication is failed');
+        $ret = array('Error'=>'Token is required');
+        echo json_encode($ret);
+    }else{
+        $result =array();
+        $result[] = array("pay_type"=>"Cash","pay_name"=>"Cash");
+        $result[] = array("pay_type"=>"Check","pay_name"=>"Check");
+        $result[] = array("pay_type"=>"OnAcct","pay_name"=>"On Account");
+        $result[] = array("pay_type"=>"CC","pay_name"=>"CC");
+
+        $Object->close_conn();
+        echo json_encode($result);
+    }
+
+

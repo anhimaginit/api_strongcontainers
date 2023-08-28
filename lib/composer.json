@@ -1,0 +1,7 @@
+{
+    "require": {
+       "kreait/firebase-php": "^4.18",
+        "clicksend/clicksend-php": "^5.0",
+        "quickbooks/v3-php-sdk": "^5.3"
+    }
+ }
