@@ -2,12 +2,8 @@
 class dbConnect{
 
     // specify your own database credentials
-   // private $host = "35.238.134.226";
-    //private $host = "35.238.134.226";
-    /*private $db_name = "freedomhw_crm_production";
-    private $username = "freedom-crm-web";
-    private $password = "FreedomIsKey!";*/
-    private $host ="localhost";
+    private $host = "35.238.134.226";
+    //private $host ="localhost";
     private $db_name = "freedomhw_crm_production";
     private $username = "freedom-crm-web";
     private $password = "FreedomIsKey!";
