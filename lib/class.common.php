@@ -1,7 +1,8 @@
 <?php
-include_once './lib/emailaddress.php';
-require_once 'db.php';
-include_once 'config.php';
+include_once 'emailaddress.php';
+require_once 'db_connect.php';
+include_once 'jwtconfig.php';
+
 
 require_once 'PHPMailer-5.2.27/PHPMailerAutoload.php';
 
@@ -19,6 +20,13 @@ class Common extends dbConnect
     const API_FOLDER_NAME = "api";
     protected $users_child = array();
     protected $parent_repeat = array();
+    public $api_domain = 'https://api.salescontrolcenter.com/';
+    public $upload_order_file_path = "photo/order/pickup_file/";
+    public $unload_order_file_path = "photo/order/delivery_file/";
+    public $pickup_path = "photo/order/pickup_file/";
+    public $delivery_path = "photo/order/delivery_file/";
+    public $driver_avatar = "photo/avatar/";
+    public $product_img = "photo/products/";
     //----------------------------------------------------------
     public function protect($dirty_string)
     {
@@ -38,6 +46,20 @@ class Common extends dbConnect
     }
 
     //----------------------------------------------------------
+    public function get_max_id($query,$field_name)
+    {
+        $result = mysqli_query($this->con,$query);
+        $max_id =1;
+        if($result){
+            while ($row = mysqli_fetch_assoc($result)) {
+                $max_id = $row[$field_name] +1;
+            }
+        }
+
+        return $max_id;
+    }
+
+    //----------------------------------------------------------
     public function checkExisting($sqlText)
     {
         $check = mysqli_query($this->con,$sqlText);
@@ -48,6 +70,148 @@ class Common extends dbConnect
         else
             return "";
     }
+    //----------------------------------------------------------
+    public function get_hour_in_date($date){
+        //$date = strtotime("2023-09-15 12:00");
+        $hours = date('H', $date);
+         return intval($hours);
+    }
+    //------------------------------------------------------------
+    public function  is_Date($date){
+        //echo "<pre>";print_r($date);echo "</pre>"; die();
+        $m_temp = explode(" ",$date);
+        if(isset($m_temp[1])){
+            $format = 'Y-m-d H:i';
+            $s_temp = explode(":",$m_temp[1]);
+            if(isset($s_temp[2])){
+                $format = 'Y-m-d H:i:s';
+            }
+        }else{
+            $format = 'Y-m-d';
+        }
+
+        $d = DateTime::createFromFormat($format, $date);
+        if($d && $d->format($format) === $date){
+            return $date;
+        }else{
+            return "";
+        }
+    }
+    //------------------------------------------------------------
+    public function  is_Date1($date){
+        $m_temp = explode(" ",$date);
+        //echo "<pre>";print_r($m_temp);echo "</pre>"; die();
+        if(isset($m_temp[1])){
+            $format = 'Y-m-d H:i';
+            $s_temp = explode(":",$m_temp[1]);
+            if(isset($s_temp[2])){
+                $format = 'Y-m-d H:i:s';
+            }
+
+        }else{
+            $format = 'Y-m-d';
+        }
+
+        $d = DateTime::createFromFormat($format, $date);
+        if($d && $d->format($format) === $date){
+            return $date;
+        }else{
+            return "";
+        }
+    }
+
+    //------------------------------------------------------------
+    public function  date_hms($date){
+        $m_temp = explode(" ",$date);
+        //echo "<pre>";print_r($m_temp);echo "</pre>"; die();
+        $date_return = '';
+        if(isset($m_temp[1])){
+            $is_second =1;
+            //$format = 'Y-m-d H:i';
+            $date_return = $date.":00:00";
+            $s_temp = explode(":",$m_temp[1]);
+            if(isset($s_temp[2])){
+                //$format = 'Y-m-d H:i:s';
+                $date_return = $date;
+            }else{
+                if(isset($s_temp[1])) $date_return = $date.":00";
+            }
+
+        }else{
+            $date_return = $date." 00:00:00";
+        }
+      return $date_return;
+    }
+
+    //----------------------------------------------------------
+    public function return_id($sqlText,$field)
+    {
+        $result = mysqli_query($this->con,$sqlText);
+        $id = '';
+        if($result){
+            while ($row = mysqli_fetch_assoc($result)) {
+                $id = $row[$field];
+            }
+        }
+        return $id;
+    }
+    //----------------------------------------------------------
+    public function update_table($table,$array_primary,$arr_key_value){
+        $query = "UPDATE `{$table}`";
+                if(count($arr_key_value) >0){
+                    $i=1;
+                    foreach($arr_key_value as $key=>$value){
+                        if($i ==1){
+                            $query.=" SET $key = '{$value}'";
+                        }else{
+                            $query.=",$key = '{$value}'";
+                        }
+                        $i++;
+                    }
+
+                    if(count($array_primary) > 0){
+                        $j=1;
+                        foreach($array_primary as $key=>$value){
+                            if($j ==1){
+                                $query.=" WHERE $key = '{$value}'";
+                            }else{
+                                $query.=" AND $key = '{$value}'";
+                            }
+                            $j++;
+                        }
+
+                    }
+                    //die($query);
+                    $update = mysqli_query($this->con,$query);
+                    return $update;
+                }
+    }
+    //-------------------------------------------------------
+    public function upload_exception($err){
+        switch($err){
+            case 0:
+                return "";
+                break;
+            case 1:
+                return "The uploaded file exceeds the upload_max_filesize directive in php.ini";
+                break;
+            case 2:
+                return "The uploaded file exceeds the MAX_FILE_SIZE directive that was specified in the HTML form";
+                break;
+            case 3:
+                return "The uploaded file was only partially uploaded";
+                break;
+            case 4:
+                return "No file was uploaded";
+                break;
+            case 5:
+                return ;
+            case 6:
+                return "Missing a temporary folder";
+                break;
+        }
+    }
+
     //----------------------------------------------------------
     public function existRow($sqlText){
         $result = mysqli_query($this->con,$sqlText);
@@ -60,6 +224,14 @@ class Common extends dbConnect
         }
         return $exists;
     }
+
+
+    //----------------------------------------------------------
+    public function delete_f($sqlText)
+    {
+        mysqli_query($this->con,$sqlText);
+    }
+
     //----------------------------------------------------------
     public function getRow($sqlText){ 
         //mysql_query("SET NAMES 'utf8'");  
@@ -742,7 +914,7 @@ class Common extends dbConnect
 
 
                 if(!empty($notes_value)){
-                    $insertNotes = "INSERT INTO notes ({$notes_fields}) VALUES{$notes_value}";
+                    $insertNotes = "INSERT INTO `notes` ({$notes_fields}) VALUES{$notes_value}";
                     //print_r($insertNotes); echo ";;;";
                     mysqli_query($this->con,$insertNotes);
                     if(mysqli_error($this->con)){
@@ -904,7 +1076,7 @@ class Common extends dbConnect
         $search_conditions =$criteria;
         //get salesman belong to $idlogin
         $salesman_query = "Select DISTINCT c.ID
-         From orders_short o
+         From quote_short o
          Inner Join contact_short as c ON o.s_ID = c.ID";
 
         if(!empty($idlogin)){
@@ -1037,10 +1209,10 @@ class Common extends dbConnect
     public function orders($b_ID=null)
     {
         if(!empty($b_ID)){
-            $sqlText = "Select distinct order_id as ID From orders_short
+            $sqlText = "Select distinct order_id as ID From quote_short
             Where b_ID = '{$b_ID}' || order_create_by ='{$b_ID}' ORDER BY order_id ASC";
         }else{
-            $sqlText = "Select order_id as ID From orders_short ORDER BY order_id ASC";
+            $sqlText = "Select order_id as ID From quote_short ORDER BY order_id ASC";
         }
 
         $result = mysqli_query($this->con,$sqlText);
@@ -1065,7 +1237,7 @@ class Common extends dbConnect
             $warrID =0;
         }
 
-        $sqlText = "Select order_id From orders_short
+        $sqlText = "Select order_id From quote_short
             Where warranty IN ({$warrID}) ORDER BY order_id ASC";
         $result = mysqli_query($this->con,$sqlText);
 
@@ -1345,7 +1517,7 @@ class Common extends dbConnect
     //----------------------------------------------------------
     public function contactsForAffiliate($idlogin,$contactIDs=null,$type=null)
     {
-        $sqlText = "Select DISTINCT salesperson From orders
+        $sqlText = "Select DISTINCT salesperson From quote
         where contact_inactive = 0 AND bill_to = '{$idlogin}'";
         $result = mysqli_query($this->con,$sqlText);
 
@@ -2264,7 +2436,7 @@ opened,date_sent,content from `track_email` where sent_by_id = '{$id}'";
         $query = "select order_id,balance,createTime,payment,
         total,warranty,b_name,b_ID,b_primary_city,b_primary_email,b_primary_phone,
         b_primary_state,s_name,s_ID,s_primary_city,s_primary_email,s_primary_phone,s_primary_state
-        from `orders_short` where b_ID = '{$bill_to}'";
+        from `quote_short` where b_ID = '{$bill_to}'";
         // die($query);
         $list = array();
         $rsl = mysqli_query($this->con,$query);
@@ -2284,7 +2456,7 @@ opened,date_sent,content from `track_email` where sent_by_id = '{$id}'";
         w.warranty_end_date,w.warranty_address1,w.warranty_creation_date,
         w.salesman,W.ID
         from `warranty_short` as w
-        left join orders_short as o on o.order_id = w.warranty_order_id
+        left join quote_short as o on o.order_id = w.warranty_order_id
         where o.bill_to = '{$bill_to}'";
         // die($query);
         $list = array();
@@ -2306,7 +2478,7 @@ opened,date_sent,content from `track_email` where sent_by_id = '{$id}'";
 i.payment,i.salesperson,i.total,i.createTime,i.customer_name,i.sale_name,
 i.ID
         from `invoice_short` as i
-        left join orders_short as o on o.order_id = i.order_id
+        left join quote_short as o on o.order_id = i.order_id
         where o.bill_to = '{$bill_to}'";
         // die($query);
         $list = array();
@@ -2321,7 +2493,7 @@ i.ID
     }
 
     //----------------------------------------------------------
-    public function mail_to($from,$receiver_name,$email,$subject,$content, $id_tracking=null,$attachment=null, $file_name=null){
+    /*public function mail_to1($from_name,$receiver_name,$to_email,$subject,$content, $id_tracking=null,$attachment=null, $file_name=null){
         date_default_timezone_set('Etc/UTC');
 
         $Ob_manager = new EmailAdress();
@@ -2340,8 +2512,53 @@ i.ID
         $mail->SMTPAuth = true;
         $mail->Username = "marketing@freedomhw.com";
         $mail->Password = "aL9zuKiIRK44voh1Jx0hsA";
-        $mail->setFrom("marketing@freedomhw.com", $from);
-        $mail->addAddress($email, $receiver_name);
+        $mail->setFrom("marketing@freedomhw.com", $from_name);
+        $mail->addAddress($to_email, $receiver_name);
+
+        $mail->Subject = $subject;
+
+        if(!empty($attachment)){
+            $mail->addAttachment($attachment, $file_name);
+        }
+
+        $tempDate = date("Y-m-d H:i:s");
+
+        //$mail->Body    = $link;
+        $mail->IsHTML(true); // send as HTML
+        $mail->MsgHTML($body);
+
+        if (!$mail->send()) {
+            unset($Ob_manager);
+            return $mail->ErrorInfo;
+        } else {
+            unset($Ob_manager);
+            return 1;
+        }
+
+    }
+    */
+
+    public function mail_to($from_name,$receiver_name,$to_email,$subject,$content, $id_tracking=null,$attachment=null, $file_name=null){
+        date_default_timezone_set('Etc/UTC');
+
+        $Ob_manager = new EmailAdress();
+        $api_path = $Ob_manager->api_path;
+        //require 'PHPMailer-5.2.27/PHPMailerAutoload.php';
+        $body = '';
+        if(!empty($id_tracking)){
+            $body .= "<img src='".$api_path."/trackonline.php?id=".$id_tracking."' border='0' width='1' height='1' alt=''>";
+        }
+        $body.=$content;
+        $mail = new PHPMailer;
+        $mail->isSMTP();
+        $mail->Host = 'smtp.office365.com';
+        $mail->Port = 587;
+        $mail->SMTPSecure = 'tls';////Set the encryption system to use - ssl (deprecated) or tls
+        $mail->SMTPAuth = true;
+        $mail->Username = "info@strongcontainers.com";
+        $mail->Password = "Trouble54321!";
+        $mail->setFrom("sales@strongcontainers.com", $from_name);
+        $mail->addAddress($to_email, $receiver_name);
 
         $mail->Subject = $subject;
 
@@ -2628,7 +2845,7 @@ opened,date_sent,content from `track_email` where id = '{$id}'";
 
        $query ="Select i.ID, i.unit, i.level, i.acl_rules from acl_rules as i
         Where i.unit = '{$type}' AND i.level = '{$roleConvert}' LIMIT 1";
-
+        //die($query);
        $rlt_int_acl = mysqli_query($this->con,$query);
 
        $int_acl = array();
@@ -2776,7 +2993,7 @@ opened,date_sent,content from `track_email` where id = '{$id}'";
     //----------------------------------------------------------
     public function orders_contact($b_ID=null)
     {
-        $sqlText = "Select DISTINCT order_id, balance, b_name, payment, total, order_title From orders_short
+        $sqlText = "Select DISTINCT order_id, balance, b_name, payment, total, order_title From quote_short
             Where bill_to = '{$b_ID}' || order_create_by = '{$b_ID}' ORDER BY order_id ASC";
 
         $result = mysqli_query($this->con,$sqlText);
@@ -2840,7 +3057,7 @@ opened,date_sent,content from `track_email` where id = '{$id}'";
        // $orders = explode(",",$order_id);
 
         $sqlText = "Select products_ordered
-            From orders
+            From quote
         where order_id IN ({$order_id}) AND
         JSON_SEARCH(products_ordered, 'all', 'Warranty') IS NOT NULL";
         //die($sqlText);
@@ -2950,7 +3167,7 @@ opened,date_sent,content from `track_email` where id = '{$id}'";
     //------------------------------------------------------------
     public function getSubs_orderID($order_id)
     {
-        $query = "Select subscription from orders
+        $query = "Select subscription from quote
         where order_id='{$order_id}'";
         $result = mysqli_query($this->con,$query);
 
@@ -2973,24 +3190,6 @@ opened,date_sent,content from `track_email` where id = '{$id}'";
             return date("Y-m-d");
         }
     }
-
-    //------------------------------------------------------------
-    public function  is_Date($date){
-        $m_temp = explode(" ",$date);
-        if(isset($m_temp[1])){
-            $format = 'Y-m-d H:i:s';
-        }else{
-            $format = 'Y-m-d';
-        }
-
-        $d = DateTime::createFromFormat($format, $date);
-        if($d && $d->format($format) === $date){
-            return $date;
-        }else{
-            return "";
-        }
-    }
-
     //------------------------------------------------------------
     public function processACL($rsl){
         if(count($rsl)>1){
@@ -4258,7 +4457,6 @@ opened,date_sent,content from `track_email` where id = '{$id}'";
 
         return $acl;
     }
-
     //----------------------------------------------------------
     public function email_register($email,$from_email,$from_name,$from_id,$domain_path=null)
     {
@@ -4297,7 +4495,6 @@ opened,date_sent,content from `track_email` where id = '{$id}'";
 
         }
     }
-
     //----------------------------------------------------------
     public function validateDiscountFields($discount_name,$start_date,$stop_date=null,$nerver_expired=null)
     {
@@ -4323,8 +4520,7 @@ opened,date_sent,content from `track_email` where id = '{$id}'";
 
         return array('error'=>$error,'errorMsg'=>$errorMsg);
     }
-
-    //----------------------------------------------------------
+//----------------------------------------------------------
     public function loginGenerateToken1($UID,$first_name,$last_name,$primary_email,$type=null){
         $config = new Config();
         $jwt_key = $config->jwt_key;
@@ -4341,7 +4537,7 @@ opened,date_sent,content from `track_email` where id = '{$id}'";
         $acl_list=array();
         $intACL =array();
         //get user's role
-        $roles_Q ="Select department, group_name, role,acl from groups
+        $roles_Q ="Select department, group_name, role,acl from `groups`
         Where department ='{$type}' AND JSON_SEARCH(`users`, 'all', '{$UID}') IS NOT NULL";
 
         $rlt_role = mysqli_query($this->con,$roles_Q);
@@ -4386,8 +4582,11 @@ opened,date_sent,content from `track_email` where id = '{$id}'";
             $intACL =  $this->processACL_again($acl_process);
 
         }
+       // print_r($intACL); die();
         //get internal ACL
         $acl_list['int_acl']= $intACL;
+        $list[0]["acl_list"] = $acl_list;
+        //echo "<pre>";print_r($list);echo "</pre>"; die();
         //print_r($intACL); die();
         $key = base64_decode($jwt_key).$UID;
 
@@ -4410,8 +4609,6 @@ opened,date_sent,content from `track_email` where id = '{$id}'";
         $ret = JWT::encode($token, $key,'HS512');
 
         $list[0]["jwt"] = $ret;
-        $list[0]["acl_list"] = $acl_list;
-
         //refresh token
         $refresh_token = array(
             "iss" => $jwt_iss,
@@ -4433,8 +4630,6 @@ opened,date_sent,content from `track_email` where id = '{$id}'";
         unset($config);
         return $list;
     }
-
-
     //----------------------------------------------------------
     public function addNewDiscount($discount_name,$apply_to,
                                    $start_date,$stop_date,$excludesive_offer,$active,$nerver_expired){
@@ -4475,9 +4670,7 @@ opened,date_sent,content from `track_email` where id = '{$id}'";
             }
 
     }
-
-
-    //----------------------------------------------------------
+ //----------------------------------------------------------
     public function updateDiscount($id,$discount_name,$apply_to,
                                    $start_date,$stop_date,$excludesive_offer,$active,$nerver_expired){
 
@@ -4554,6 +4747,38 @@ opened,date_sent,content from `track_email` where id = '{$id}'";
 
         }
         return $list;
+    }
+    //----------------------------------------------------------
+    public function check_discount_code($discount_code){
+        $current = date("Y-m-d");
+        $query ="SELECT apply_to,start_date FROM discount WHERE discount_code ='{$discount_code}'
+        AND active =1 AND stop_date > '{$current}'
+        LIMIT 1";
+        //die($query);
+        $result = mysqli_query($this->con,$query);
+        $list = array();
+        if($result){
+            while ($row = mysqli_fetch_assoc($result)) {
+                $row['apply_to']= json_decode($row['apply_to'],true);
+                $list = $row;
+            }
+        }
+
+        if(count($list) >0){
+            if($list['start_date'] !='' && $list['start_date'] !=null){
+               $start_date = date($list['start_date']);
+                //echo "<pre>";print_r($start_date);echo "</pre>"; die();
+                if($current >= $start_date){
+                   return  $list["value"] =$list['apply_to']["value"];
+                }else{
+                    return  $list["value"]=array("discount_type"=>"$","discount"=>"0");
+                }
+            }else{
+                $list["value"] =$list['apply_to']["value"];
+            }
+        }else{
+            return  $list["value"]=array("discount_type"=>"$","discount"=>"0");
+        }
     }
 
     //----------------------------------------------------------
@@ -4648,7 +4873,7 @@ opened,date_sent,content from `track_email` where id = '{$id}'";
     //------------------------------------------------------------
     public function test1($type,$UID){
         //get user's role
-        $roles_Q ="Select department, group_name, role,acl from groups
+        $roles_Q ="Select department, group_name, role,acl from `groups`
         Where department ='{$type}' AND JSON_SEARCH(`users`, 'all', '{$UID}') IS NOT NULL";
 
         $rlt_role = mysqli_query($this->con,$roles_Q);
@@ -4678,7 +4903,7 @@ opened,date_sent,content from `track_email` where id = '{$id}'";
     //------------------------------------------------------------
     public function getProds_orderID($orderID){
         $query ="SELECT o.products_ordered,o.total,o.order_title,x.invoiceDate
-               FROM  orders_short as o
+               FROM  quote_short as o
                left join(
             Select p.orderID ,MAX(p.invoiceDate) as invoiceDate
             from payment_schedule_short as p
@@ -4987,7 +5212,7 @@ opened,date_sent,content from `track_email` where id = '{$id}'";
     //------------------------------------------------------------
     public function getProdsByOrderID($orderID){
         $query ="SELECT products_ordered
-               FROM  orders
+               FROM  quote
                WHERE order_id ='{$orderID}'";
 
         $sqlExecuting = mysqli_query($this->con,$query);
@@ -5145,7 +5370,7 @@ opened,date_sent,content from `track_email` where id = '{$id}'";
     public function orderRelative($parent_id)
     {
         $sqlText = "Select DISTINCT order_id
-        From orders_short
+        From quote_short
             Where b_ID = '{$parent_id}'";
 
         //die($sqlText);
@@ -5181,11 +5406,8 @@ opened,date_sent,content from `track_email` where id = '{$id}'";
     //------------------------------------------------------------
     public function getOverage_contactID($contactID)
     {
-        $sqlText ="select sum(overage)-
-                   IFNULL((select sum(pay_amount) from pay_acc_short
-                     where customer='{$contactID}' AND pay_type='OnAcct'),0) AS total_overage
-                  from pay_acc_short
-                  where customer='{$contactID}'";
+        $sqlText ="select sum(contract_overage) as total_overage FROM quote
+        WHERE bill_to = '{$contactID}'";
         $result = mysqli_query($this->con,$sqlText);
 
         $total_overage=0;
@@ -5194,9 +5416,16 @@ opened,date_sent,content from `track_email` where id = '{$id}'";
                 $total_overage = $row['total_overage'];
             }
         }
+
+        return $total_overage;
+        /*$sqlText ="select sum(overage)-
+                 IFNULL((select sum(pay_amount) from pay_acc_short
+                   where customer='{$contactID}' AND pay_type='OnAcct'),0) AS total_overage
+                from pay_acc_short
+                where customer='{$contactID}'";*/
         //----------sum contract-overage-------------
-        $query ="select sum(contract_overage)
-                  from orders
+       /* $query ="select sum(contract_overage) as contract_overage
+                  from quote
                   where bill_to='{$contactID}'";
         $result = mysqli_query($this->con,$query);
         $total_overage1=0;
@@ -5207,9 +5436,27 @@ opened,date_sent,content from `track_email` where id = '{$id}'";
             }
         }
         return $total_overage +$total_overage1;
+        */
     }
 
+    //------------------------------------------------------------
+    public function payment_oder_id($oder_id)
+    {
+        $sqlText ="select sum(pay_amount) as payment_total from pay_acct
+                       where order_id='{$oder_id}'";
 
+        $result = mysqli_query($this->con,$sqlText);
+
+        $payment_total=0;
+        if($result){
+            while ($row = mysqli_fetch_assoc($result)) {
+                $payment_total = $row['payment_total'];
+            }
+        }
+
+        return $payment_total;
+
+    }
     //------------------------------------------------------------------
     public function updateStartDateforWarranty($warrantyID){
         $createTime = date("Y-m-d");
@@ -5318,6 +5565,64 @@ opened,date_sent,content from `track_email` where id = '{$id}'";
         }else{
             return mysqli_error($this->con);
         }
+    }
+
+    //------------------------------------------------------------
+    public function depot_info_by_sku($sku,$quote_temp_id=null)
+    {
+        $sku =trim($sku);
+        $query = "SELECT * FROM depot_product_short
+        WHERE TRIM(`SKU`) ='{$sku}'";
+        $result = mysqli_query($this->con,$query);
+        $list = array();
+        if($result){
+            while ($row = mysqli_fetch_assoc($result)) {
+                if($row["SKU"] !='' && $quote_temp_id !=''){
+                    $query="SELECT distance FROM quote_data_temp WHERE prod_SKU = '{$sku}' AND
+                    quote_temp_id ='{$quote_temp_id}'";
+                    $row["distance"] = $this->return_id($query,"distance");
+                }
+                $list = $row;
+            }
+        }
+
+        return $list;
+    }
+
+    //------------------------------------------------------
+    public function get_total_payment_task($task_id)
+    {
+        $sqlText = "Select SUM(pay_amount) as total_payment From pay_for_driver
+        WHERE pay_task='{$task_id}'";
+
+        $result = mysqli_query($this->con,$sqlText);
+
+        $total_payment = 0;
+        if($result){
+            while ($row = mysqli_fetch_assoc($result)) {
+                $total_payment = $row['total_payment'];
+            }
+        }
+
+        return $total_payment;
+    }
+
+    //------------------------------------------------------
+    public function get_total_payment_driver($pay_driver)
+    {
+        $sqlText = "Select * From pay_for_driver_short
+        WHERE pay_driver='{$pay_driver}' order by pay_task DESC ";
+
+        $result = mysqli_query($this->con,$sqlText);
+
+        $list = array();
+        if($result){
+            while ($row = mysqli_fetch_assoc($result)) {
+                $list[] = $row;
+            }
+        }
+
+        return $list;
     }
    //////////
 }  

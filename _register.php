@@ -34,7 +34,7 @@ $isAuth =$Object->basicAuth($token);
 if(!$isAuth && empty($isvalid)){
     $ret = array('ERROR'=>'Authentication is failed');
 }else{
-    $errObj = $Object->validate_contact_fields($first_name,$last_name,$primary_email,$primary_street_address1);
+    $errObj = $Object->validate_contact_fields($first_name,$last_name,$primary_email,$primary_street_address1,$primary_city,$primary_state);
 
     if(!$errObj['error']){
         //upload file

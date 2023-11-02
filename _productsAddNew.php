@@ -12,7 +12,8 @@ include_once '_qbviacurl.php';
         'prod_class','prod_cost','prod_desc','prod_desc_short',
         'prod_height','prod_inactive','prod_length','prod_name','prod_price',
         'prod_type','prod_visible','prod_weight','prod_width',
-        'SKU','prod_file_name','prod_internal_visible','jwt','private_key');
+        'SKU','prod_file_name','prod_internal_visible','jwt','private_key',
+        'depot_id','container_type_id');
 
     foreach ($EXPECTED AS $key) {
         if (!empty($_POST[$key])){
@@ -127,8 +128,9 @@ include_once '_qbviacurl.php';
                                 $flag = in_array($extension,[ 'jpg', 'jpeg', 'gif', 'png', 'pdf','JPG', 'JPEG','PNG']);
 
                                 if($flag){
-                                    $name ="/photo/products/".uniqid()."_".$prod_file_name;
-                                    $photoPathTemp = $_SERVER["DOCUMENT_ROOT"].$name; //'.'.$extension;
+                                    $prod_file_name = uniqid()."_".$prod_file_name;
+                                    $name ="/photo/products/".$prod_file_name;
+                                    $photoPathTemp = $_SERVER["DOCUMENT_ROOT"].$name;
                                     $imageData = base64_decode($imageData);
                                     $upload = file_put_contents($photoPathTemp, $imageData);
                                 }
@@ -153,13 +155,14 @@ include_once '_qbviacurl.php';
 
                 if(is_numeric($upload)){
                     $upload ="SUCCESS";
-                    $photoPath = $name;
+                    $photoPath = $prod_file_name;
                 }
                 //true continue to create new product
                 $result = $Object->addProduct($product_notes,$product_tags,$product_taxable,$product_updated_by,$prod_class,
                     $prod_cost,$prod_desc,$prod_desc_short,$prod_height,$prod_inactive,
                     $prod_length,$prod_name,$prod_price,$prod_type,
-                    $prod_visible, $prod_weight,$prod_width,$SKU,$photoPath,$prod_internal_visible);
+                    $prod_visible, $prod_weight,$prod_width,$SKU,$photoPath,$prod_internal_visible,
+                    $depot_id,$container_type_id);
 
                 if(is_numeric($result) && $result){
                     $Object->addTag("Product",$product_tags);
@@ -195,9 +198,9 @@ include_once '_qbviacurl.php';
                     $ret = array('SAVE'=>'SUCCESS','ERROR'=>'', 'UPLOAD'=>$upload,'ID'=>$result,'CreatedId'=>$rsl["CreatedId"]);
                 } else {
                     if($result){
-                        $ret = array('SAVE'=>'FAIL','ERROR'=>$result,'UPLOAD'=>$upload);
+                        $ret = array('SAVE'=>'FAIL','ERROR'=>$result,'ID'=>$result,'UPLOAD'=>$upload);
                     }else{
-                        $ret = array('SAVE'=>'FAIL','ERROR'=>'System can not add the product.','UPLOAD'=>$upload);
+                        $ret = array('SAVE'=>'FAIL','ERROR'=>'System can not add the product.','ID'=>'','UPLOAD'=>$upload);
                     }
 
                 }

@@ -6,7 +6,7 @@
  */
 
 // The order of the following four steps is significant
-require_once('../sdk/config.php');
+require_once('../sdk/jwtconfig.php');
 define('PATH_TAIL', 'Utility.Test');
 define('TESTSUITE_NAME', 'Utility_Tests');
 define('PATH_DEST', PATH_SDK_ROOT . 'sdk/' . PATH_TAIL . '/');

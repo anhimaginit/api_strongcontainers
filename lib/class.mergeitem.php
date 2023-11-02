@@ -385,7 +385,7 @@ class Mergeitem extends Common{
     //----------------------------------------------------------
     public function mGetOrder_billto_saleID($ContactID_k,$salesman_k,$ContactID_m,$salesman_m,$contact_merged)
     {
-        $query = "SELECT DISTINCT order_id,bill_to,salesperson,order_create_by from orders";
+        $query = "SELECT DISTINCT order_id,bill_to,salesperson,order_create_by from quote";
 
         $where ='';
         if(!(empty($ContactID_m))){
@@ -467,7 +467,7 @@ class Mergeitem extends Common{
     //----------------------------------------------------------
     public function mUpdateOrder($update_query,$update_m,$order_id,$ContactID_k,$salesman_k,
                                  $ContactID_m,$salesman_m,$fields,$values,$contact_merged){
-        $update = "UPDATE `orders`
+        $update = "UPDATE `quote`
                  SET ".$update_query."
                  WHERE order_id='{$order_id}'";
 
@@ -1565,7 +1565,7 @@ class Mergeitem extends Common{
 
     //----------------------------------------------------------
     public function undoOrder($update_query,$order_id,$ID_m){
-        $update = "UPDATE `orders` SET ".$update_query." WHERE order_id ='{$order_id}'";
+        $update = "UPDATE `quote` SET ".$update_query." WHERE order_id ='{$order_id}'";
         $rsl = mysqli_query($this->con,$update);
 
         if($rsl){

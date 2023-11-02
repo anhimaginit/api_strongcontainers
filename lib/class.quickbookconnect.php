@@ -133,7 +133,7 @@ class Quickbookconnect extends Common{
 
   //----------------------------------------------------------
     public function qbGetProductordered_orderid($order_id){
-        $sqlText ="select products_ordered from orders
+        $sqlText ="select products_ordered from quote
         where order_id ='{$order_id}'";
 
         $result = mysqli_query($this->con,$sqlText);
@@ -446,7 +446,7 @@ class Quickbookconnect extends Common{
         o.order_title,o.discount_code,
         o.contract_overage,o.grand_total,
         o.subscription  from invoice as i
-        left join orders as o on o.order_id = i.order_id
+        left join quote as o on o.order_id = i.order_id
         where TxnId ='{$TaxId}' LIMIT 1 ";
 
         $result = mysqli_query($this->con,$sqlText);

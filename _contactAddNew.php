@@ -36,8 +36,8 @@ if(!$isAuth){
     $errObj['errorMsg']="Authentication is failed";
     if($isAuth['AUTH']){
         //print_r($isAuth); die("1234");
-        //$errObj = $Object->validate_contact_fields($first_name,$last_name,$primary_email,$primary_street_address1);
-        $errObj = $Object->validateContactFieldEmailOrPhone($primary_email,$primary_phone);
+        $errObj = $Object->validate_contact_fields($first_name,$last_name,$primary_email,$primary_street_address1,$primary_city,$primary_state);
+        //$errObj = $Object->validateContactFieldEmailOrPhone($primary_email,$primary_phone);
         if(!$errObj['error']){
             if($contact_inactive=="" || empty($contact_inactive)) {
                 $contact_inactive =0;
@@ -141,7 +141,7 @@ if(!$isAuth){
                 //Add vendor type
                 $p = stripos($contact_type,"Vendor");
                 if(is_numeric($p)){
-                    $vendor = true;
+                    $vendor = 1;
                 }else{
                     $vendor = 0;
                 }
@@ -227,7 +227,7 @@ if(!$isAuth){
                 $Object->err_log("Contact",$info,0);
                 if($result){
                     if($result["ID"]=='The phone and email are used'){
-                        $code=403;
+                       // $code=403;
                     }else{
                         $result['contact_duplicated']=array();
                     }

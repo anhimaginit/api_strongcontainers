@@ -223,7 +223,7 @@ class Report extends Common{
     }
 
     /**
-     * get report orders
+     * get report quote
      */
     public function reportOrder($data,$personal_filter,$id_login)
     {
@@ -508,7 +508,7 @@ class Report extends Common{
     }
 
     /**
-     * get report orders
+     * get report quote
      */
     public function reportDownloadCsvOrder($data)
     {
@@ -2647,7 +2647,7 @@ class Report extends Common{
 
     //----------------------------------------------------------
     public function getwarrantyID_orderTitle($title){
-        $query ="Select order_id from orders
+        $query ="Select order_id from quote
                 Where order_title like '%{$title}%' AND order_title <>'' AND order_title IS NOT NULL ";
 
         $result = mysqli_query($this->con,$query);
@@ -2669,7 +2669,7 @@ class Report extends Common{
 
     //----------------------------------------------------------
     public function getwarrantyID_type($warranty_type){
-        $query ="Select order_id from orders
+        $query ="Select order_id from quote
                 Where JSON_SEARCH(products_ordered, 'all', 'Warranty') IS NOT NULL";
 
         $result = mysqli_query($this->con,$query);
@@ -2869,7 +2869,7 @@ class Report extends Common{
     {
         $sqlText ="select order_id,order_title,payment,balance,total,
                    (total-payment) as paid
-                  from orders
+                  from quote
                   where discount_code='{$discount_code}'";
         $result = mysqli_query($this->con,$sqlText);
         $list=array();
@@ -3097,7 +3097,7 @@ class Report extends Common{
 //------------------------------------------------------------------
     public function getOderOrder_ids($ID){
         $query = "SELECT order_id as id, order_id as text
-         FROM  orders
+         FROM  quote
          WHERE order_id LIKE '%{$ID}%'";
         $result = mysqli_query($this->con,$query);
 
@@ -3131,7 +3131,7 @@ class Report extends Common{
     //------------------------------------------------------------------
     public function getOderOrderTitle_title($order_title){
         $query = "SELECT order_title as id, order_title as text
-         FROM  orders
+         FROM  quote
          WHERE order_title LIKE '%{$order_title}%'";
         $result = mysqli_query($this->con,$query);
 

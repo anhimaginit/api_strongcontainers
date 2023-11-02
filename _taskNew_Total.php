@@ -23,7 +23,7 @@ include_once './lib/class.task.php';
     if(!$isAuth){
         $ret = array('ERROR'=>'Authentication is failed','total'=>0);
     }else{
-        $result = $Object->getTotal_newTask($contactID);
+        $result = $Object->get_task_open_status($contactID);
         $ret = array('ERROR'=>'','total'=>$result);
     }
 

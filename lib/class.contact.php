@@ -9,12 +9,10 @@ require_once 'class.affiliate.php';
 require_once 'class.employee.php';
 
 class Contact extends Common{
-
     //------------------------------------------------------------
     public function contactTotal($filterAll=null,$role=null,$id_login=null)
     {
         $criteria = "";
-
         if(!empty($filterAll)){
             $criteria .= " ((c.first_name LIKE '%{$filterAll}%') OR ";
             $criteria .= " (c.last_name LIKE '%{$filterAll}%') OR ";
@@ -24,7 +22,6 @@ class Contact extends Common{
             $criteria .= " (c.primary_state LIKE '%{$filterAll}%') OR ";
             $criteria .= " (c.primary_postal_code LIKE '%{$filterAll}%'))";
         }
-
         $criteria .= !empty($criteria) ? " AND " : "";
         $criteria .= " (c.contact_inactive = 0) ";
 
@@ -38,7 +35,7 @@ class Contact extends Common{
 
         $sqlText = "Select count(*)
                         from (
-                            select DISTINCT c.ID From orders_short o
+                            select DISTINCT c.ID From quote_short o
                             Left Join contact_short as c ON o.s_ID = c.ID
                             where o.b_ID = '{$id_login}' ".$criteria1. "
 
@@ -64,13 +61,10 @@ class Contact extends Common{
 
         return $num;
     }
-
-
     //------------------------------------------------------------
     public function searchContactList($filterAll=null,$limit,$offset,$role=null,$id_login=null)
     {
         $criteria = "";
-
         if(!empty($filterAll)){
             $criteria .= " ((c.first_name LIKE '%{$filterAll}%') OR ";
             $criteria .= " (c.last_name LIKE '%{$filterAll}%') OR ";
@@ -104,7 +98,7 @@ class Contact extends Common{
                                 c.primary_state,c.primary_postal_code,c.contact_inactive,
                                 c.create_date,c.contact_type,c.company_name,
                                 c.c_name,c.c_name_company,c.contact_name,c.f_m_lname
-                            From orders_short as o
+                            From quote_short as o
                             Left Join contact_short
                              as c ON o.s_ID = c.ID
                             where o.b_ID = '{$id_login}' ".$criteria1. "
@@ -127,7 +121,7 @@ class Contact extends Common{
                                 c.primary_state,c.primary_postal_code,c.contact_inactive,
                                 c.create_date,c.contact_type,c.company_name,
                                 c.c_name,c.c_name_company,c.contact_name,c.f_m_lname
-                            From orders_short as o
+                            From quote_short as o
                             Left Join contact_short
                              as c ON o.s_ID = c.ID
                             where o.b_ID = '{$id_login}' ".$criteria1. "
@@ -171,7 +165,6 @@ class Contact extends Common{
         }
         return $list;
     }
-
     //------------------------------------------------------------
     public function searchSalesman_idlogin($filterAll=null,$limit,$offset,$idlogin=null)
     {
@@ -207,7 +200,7 @@ class Contact extends Common{
         //c.contact_type,
         //get salesman belong to $idlogin
         $salesman_query = "Select DISTINCT c.ID,c.first_name,c.last_name,c.primary_email,c.primary_phone,c.primary_city,c.primary_state,c.primary_postal_code,c.contact_inactive
-         From orders_short o
+         From quote_short o
          Inner Join contact_short as c ON o.s_ID = c.ID";
 
         if(!empty($idlogin)){
@@ -288,7 +281,7 @@ class Contact extends Common{
 
         //get salesman belong to $idlogin
         $salesman_query = "Select count(distinct c.ID)
-         From orders_short o
+         From quote_short o
          Inner Join contact_short as c ON o.s_ID = c.ID";
 
         if(!empty($idlogin)){
@@ -338,7 +331,8 @@ class Contact extends Common{
     }
 
     //--------------------------------------------------------------
-    public function validate_contact_fields($first_name,$last_name,$primary_email,$primary_street_address1)
+    public function validate_contact_fields($first_name,$last_name,$primary_email,$primary_street_address1,
+                                            $primary_city,$primary_state)
     {
         $error = false;
         $errorMsg = "";
@@ -349,8 +343,16 @@ class Contact extends Common{
         }
 
         if(!$error && empty($primary_street_address1)){
-            //$error = true;
-           //$errorMsg = "Address is required.";
+            $error = true;
+           $errorMsg = "State is required.";
+        }
+        if(!$error && empty($primary_city)){
+            $error = true;
+            $errorMsg = "=City is required.";
+        }
+        if(!$error && empty($primary_street_address1)){
+            $error = true;
+            $errorMsg = "Address is required.";
         }
 
         if(!$error && empty($last_name)){
@@ -376,32 +378,224 @@ class Contact extends Common{
     {
 
         //verify phone and email are duplicate
-        $duplicate=0;
+        //$duplicate=0;
         $primary_phone1 = $this->format_phone($primary_phone);
-        if(!empty($primary_phone) && !empty($primary_email)){
+        $ignor = 0;
+        $selectCommand ='';
+
+        if(!empty($primary_email)){
+            $ignor=1;
+            $selectCommand ="SELECT COUNT(*) AS NUM FROM contact WHERE `primary_email` ='{$primary_email}'";
+
+            if ($this->checkExists($selectCommand)){
+                $list_duplicate = $this->getDuplicateContact($primary_email,'');
+                return array("ID"=>"The phone and email are used",'contact_duplicated'=>$list_duplicate,"notes"=>"","doc"=>"","affilateID"=>"");
+            }
+        }
+
+        if(!empty($primary_phone) && $ignor !=1){
+            $ignor=1;
+            $selectCommand ="SELECT COUNT(*) AS NUM FROM contact WHERE `primary_phone` ='{$primary_phone}' || `primary_phone` ='{$primary_phone1}'";
+            if ($this->checkExists($selectCommand)){
+                $list_duplicate = $this->getDuplicateContact('',$primary_phone);
+                return array("ID"=>"The phone and email are used",'contact_duplicated'=>$list_duplicate,"notes"=>"","doc"=>"","affilateID"=>"");
+            }/*else{
+                $selectCommand ="SELECT COUNT(*) AS NUM FROM contact_second_phone WHERE `second_phone` ='{$primary_phone}' || `second_phone` ='{$primary_phone1}'";
+                if ($this->checkExists($selectCommand)){
+                    $list_duplicate = $this->getDuplicateContact_secondphone($primary_phone);
+                    return array("ID"=>"The phone and email are used",'contact_duplicated'=>$list_duplicate,"notes"=>"","doc"=>"","affilateID"=>"");
+                }
+            }*/
+        }
+
+        /*if(!empty($primary_phone) && !empty($primary_email)){
             $duplicate=1;
             $selectCommand ="SELECT COUNT(*) AS NUM FROM contact WHERE
-                        ((`primary_phone` ='{$primary_phone}' || `primary_phone` ='{$primary_phone1}') AND
-                          primary_phone IS NOT NULL AND primary_phone <>'') AND
-                          (`primary_email` ='{$primary_email}' AND
-                          primary_email IS NOT NULL AND primary_email <>'')";
+                        (`primary_phone` ='{$primary_phone}' || `primary_phone` ='{$primary_phone1}') AND
+                          (`primary_email` ='{$primary_email}')";
         }elseif(!empty($primary_email) && empty($primary_phone)){
             $duplicate=1;
             $selectCommand ="SELECT COUNT(*) AS NUM FROM contact WHERE
-                          (`primary_email` ='{$primary_email}' AND
-                          primary_email IS NOT NULL AND primary_email <>'') AND
+                          (`primary_email` ='{$primary_email}') AND
                           (primary_phone IS NULL OR primary_phone ='')";
         }elseif(empty($primary_email) && !empty($primary_phone)){
             $duplicate=1;
             $selectCommand ="SELECT COUNT(*) AS NUM FROM contact WHERE
-                          ((`primary_phone` ='{$primary_phone}' || `primary_phone` ='{$primary_phone1}') AND
-                          primary_phone IS NOT NULL AND primary_phone <>'') AND
+                          (`primary_phone` ='{$primary_phone}' || `primary_phone` ='{$primary_phone1}')  AND
                           (primary_email IS NULL OR primary_email ='')";
         }
         if($duplicate==1){
             if ($this->checkExists($selectCommand)){
                 $list_duplicate = $this->getDuplicateContact($primary_email,$primary_phone);
-                return array("ID"=>"The phone and email are used",'contact_duplicated'=>$list_duplicate);
+                return array("ID"=>"The phone and email are used",'contact_duplicated'=>$list_duplicate,"notes"=>"","doc"=>"","affilateID"=>"");
+            }
+        }*/
+
+        /*if(!empty($primary_phone)){
+            $selectCommand ="SELECT COUNT(*) AS NUM FROM contact WHERE  `primary_phone` ='{$primary_phone}' AND
+            primary_phone IS NOT NUL AND primary_phone <>''";
+            //die($selectCommand);
+            if ($this->checkExists($selectCommand)) return array("ID"=>"The phone is used");
+        }
+
+        if(!empty($primary_email)){
+            $selectCommand ="SELECT COUNT(*) AS NUM FROM contact WHERE  `primary_email` ='{$primary_email}'";
+            if ($this->checkExists($selectCommand)) return array("ID"=>"The email is used");
+
+            //$user_temp = strtolower($user_name);
+            $selectCommand ="SELECT COUNT(*) AS NUM FROM users WHERE  `user_name` ='{$primary_email}'";
+            if ($this->checkExists($selectCommand)) return array("ID"=>"The email is used");
+            $user_name = $primary_email;
+        }*/
+
+        $first_name = trim($first_name);
+        $last_name = trim($last_name);
+        $middle_name = trim($middle_name);
+        $date = date("Y-m-d");
+        if(!empty($user_name)) $user_name = trim($user_name);
+        if(empty($contact_salesman_id)) $contact_salesman_id=0;
+        if(!isset($archive_id)) $archive_id =0;
+
+        //if(!empty($primary_phone) && strlen($primary_phone)==10) $primary_phone="1".$primary_phone;
+        $fields = "company_name,contact_inactive,contact_notes,contact_tags,contact_type,
+                            first_name,last_name,middle_name,primary_city,primary_email,
+                            primary_phone,primary_phone_ext,primary_phone_type,primary_postal_code,
+                            primary_state, primary_street_address1,primary_street_address2,primary_website,
+                            create_date,archive_id,contact_salesman_id,
+                            TaxIdentifier";
+
+        $values = "'{$company_name}','{$contact_inactive}','{$contact_notes}','{$contact_tags}','{$contact_type}',
+                '{$first_name}','{$last_name}','{$middle_name}','{$primary_city}','{$primary_email}',
+                '{$primary_phone}','{$primary_phone_ext}','{$primary_phone_type}','{$primary_postal_code}',
+                '{$primary_state}','{$primary_street_address1}','{$primary_street_address2}','{$primary_website}',
+                '{$date}','{$archive_id}','{$contact_salesman_id}',
+                '{$TaxIdentifier}'";
+        if(is_numeric($create_by)){
+            $fields .= ",create_by";
+            $values .= ",'{$create_by}'";
+        }
+        if(is_numeric($submit_by)){
+            $fields .= ",submit_by";
+            $values .= ",'{$submit_by}'";
+        }
+
+        if($gps !=''){
+            $fields .= ",gps";
+            $values .= ",'{$gps}'";
+        }
+
+        $license_exp=$this->dateYmd($license_exp);
+        if(!empty($license_exp)){
+            $fields .=",license_exp";
+            $values .=",'{$license_exp}'";
+        }
+        $w9_exp=$this->dateYmd($w9_exp);
+        if(!empty($w9_exp)){
+            $fields .=",w9_exp";
+            $values .=",'{$w9_exp}'";
+        }
+        $insurrance_exp=$this->dateYmd($insurrance_exp);
+        if(!empty($insurrance_exp)){
+            $fields .=",insurrance_exp";
+            $values .=",'{$insurrance_exp}'";
+        }
+
+        $insertCommand = "INSERT INTO contact({$fields}) VALUES({$values})";
+        //die($insertCommand);
+        //insert record contact table
+         mysqli_query($this->con,$insertCommand);
+        $idreturn = mysqli_insert_id($this->con);
+
+        //$this->addNewContactToFireBase($idreturn,$first_name,$last_name);
+
+        //check salesman active or inactive
+        $p= stripos($contact_type,"Sales");
+        if(is_numeric($p) && $contact_inactive==0){
+            $active_salesman = 1;
+        }else{
+            $active_salesman = 0;
+        }
+
+        //check Affiliate Active or inavtive
+        $p= stripos($contact_type,"Affiliate");
+        if(is_numeric($p) && $contact_inactive==0){
+            $active_affiliate = 1;
+        }else{
+            $active_affiliate = 0;
+        }
+
+        if(is_numeric($idreturn) && $idreturn){
+            //insert record  users table
+            $is_user= $this->addNewUser($idreturn,$contact_inactive,$user_name,$contact_type);
+            $p= stripos($contact_type,"Driver");
+            if(is_numeric($p) && $contact_inactive==0){
+                $this->add_update_driver($idreturn);
+            }
+            //insert record  note table
+            $note_err=array();
+            if(is_array($notes) && count($notes)>0){
+                $note_err= $this->add_notes_new($notes,$idreturn);
+            }
+            //insert doc
+            $doc_err=array();
+            if(is_array($doc) && count($doc)>0){               
+                $doc_err = $this->addContactDoc($doc,$idreturn);
+            }
+            //insert record  salesman and Affiliate table
+            if($active_salesman==1){
+                $obSalesman = new Salesman();
+                $obSalesman->addSalesman($idreturn,$active_salesman,$area);
+                $obSalesman->close_conn();
+                unset($obSalesman);
+            }
+            $affilateID="";
+            if($active_affiliate==1){
+                $obAffType = new Affiliate();
+                $affilateID=$obAffType->addAffliate($idreturn,$active_affiliate,$aff_type);
+
+                $obAffType->close_conn();
+                unset($obAffType);
+            }
+
+            return array("ID"=>$idreturn,"notes"=>$note_err,"doc"=>$doc_err,"affilateID"=>$affilateID);
+        }else{
+            return array("ID"=>mysqli_error($this->con),"notes"=>"","doc"=>"","affilateID"=>"");
+        }
+
+    }
+
+    //------------------------------------------------------------------
+    public function newContact($company_name,$contact_inactive,$contact_notes,$contact_tags,$contact_type,
+                               $first_name,$last_name,$middle_name,$primary_city,$primary_email,
+                               $primary_phone,$primary_phone_ext,$primary_phone_type,$primary_postal_code,
+                               $primary_state, $primary_street_address1,$primary_street_address2,$primary_website,$aff_type,
+                               $user_name,$password,$notes,$create_by,$submit_by,$gps,$doc=null,$archive_id=null,$area=null,
+                               $license_exp=null,$w9_exp=null,$insurrance_exp=null,$contact_salesman_id=null,$TaxIdentifier=null)
+    {
+
+        //verify phone and email are duplicate
+        $duplicate=0;
+        $primary_phone1 = $this->format_phone($primary_phone);
+        if(!empty($primary_phone) && !empty($primary_email)){
+            $duplicate=1;
+            $selectCommand ="SELECT COUNT(*) AS NUM FROM contact WHERE
+                        (`primary_phone` ='{$primary_phone}' || `primary_phone` ='{$primary_phone1}') AND
+                          (`primary_email` ='{$primary_email}')";
+        }elseif(!empty($primary_email) && empty($primary_phone)){
+            $duplicate=1;
+            $selectCommand ="SELECT COUNT(*) AS NUM FROM contact WHERE
+                          (`primary_email` ='{$primary_email}') AND
+                          (primary_phone IS NULL OR primary_phone ='')";
+        }elseif(empty($primary_email) && !empty($primary_phone)){
+            $duplicate=1;
+            $selectCommand ="SELECT COUNT(*) AS NUM FROM contact WHERE
+                          (`primary_phone` ='{$primary_phone}' || `primary_phone` ='{$primary_phone1}')  AND
+                          (primary_email IS NULL OR primary_email ='')";
+        }
+        if($duplicate==1){
+            if ($this->checkExists($selectCommand)){
+                $list_duplicate = $this->getDuplicateContact($primary_email,$primary_phone);
+                return array("ID"=>"The phone and email are used",'contact_duplicated'=>$list_duplicate,"notes"=>"","doc"=>"","affilateID"=>"");
             }
         }
 
@@ -461,8 +655,9 @@ class Contact extends Common{
         }
 
         $insertCommand = "INSERT INTO contact({$fields}) VALUES({$values})";
+        //die($insertCommand);
         //insert record contact table
-         mysqli_query($this->con,$insertCommand);
+        mysqli_query($this->con,$insertCommand);
         $idreturn = mysqli_insert_id($this->con);
 
         //$this->addNewContactToFireBase($idreturn,$first_name,$last_name);
@@ -495,7 +690,7 @@ class Contact extends Common{
             }
             //insert doc
             $doc_err=array();
-            if(is_array($doc) && count($doc)>0){               
+            if(is_array($doc) && count($doc)>0){
                 $doc_err = $this->addContactDoc($doc,$idreturn);
             }
             //insert record  salesman and Affiliate table
@@ -728,39 +923,40 @@ class Contact extends Common{
         $primary_phone =trim($primary_phone);
 
         //verify phone and email are duplicate
-        $duplicate=0;
+        $duplicate =0; $ignor =0;
         $primary_phone1 = $this->format_phone($primary_phone);
-        if(!empty($primary_phone) && !empty($primary_email)){
-            $duplicate=1;
+        if(!empty($primary_email)){
+            $ignor=1;
             $selectCommand ="SELECT COUNT(*) AS NUM FROM contact WHERE
-                        ((`primary_phone` ='{$primary_phone}' || `primary_phone` ='{$primary_phone1}') AND
-                          primary_phone IS NOT NULL AND primary_phone <>'') AND
-                          (`primary_email` ='{$primary_email}' AND
-                          primary_email IS NOT NULL AND primary_email <>'') AND
-                          ID <> '{$id}' AND (contact_inactive=0 OR contact_inactive IS NULL)";
-        }elseif(!empty($primary_email) && empty($primary_phone)){
-            $duplicate=1;
-            $selectCommand ="SELECT COUNT(*) AS NUM FROM contact WHERE
-                          (`primary_email` ='{$primary_email}' AND
-                          primary_email IS NOT NULL AND primary_email <>'') AND
-                          (primary_phone IS NULL OR primary_phone ='') AND
-                          ID <> '{$id}' AND (contact_inactive=0 OR contact_inactive IS NULL)";
-        }elseif(empty($primary_email) && !empty($primary_phone)){
-            $duplicate=1;
-            $selectCommand ="SELECT COUNT(*) AS NUM FROM contact WHERE
-                          ((`primary_phone` ='{$primary_phone}' || `primary_phone` ='{$primary_phone1}') AND
-                          primary_phone IS NOT NULL AND primary_phone <>'') AND
-                          (primary_email IS NULL OR primary_email ='') AND
-                          ID <> '{$id}' AND (contact_inactive=0 OR contact_inactive IS NULL)";
+                          `primary_email` ='{$primary_email}'  AND ID <> '{$id}' ";
+            if($save_anyway==0){
+                if ($this->checkExists($selectCommand)){
+                    $list_duplicate = $this->getDuplicateContact($primary_email,'',$id);
+                    return array("updated"=>"The phone and email are used",'contact_duplicated'=>$list_duplicate);
+                }
+            }
         }
-        if($duplicate==1 && $save_anyway==0){
+
+      if($ignor !=1 && !empty($primary_phone)){
+            $selectCommand ="SELECT COUNT(*) AS NUM FROM contact WHERE
+                          (`primary_phone` ='{$primary_phone}' || `primary_phone` ='{$primary_phone1}') AND
+                          ID <> '{$id}'";
+          if($save_anyway==0){
+              if ($this->checkExists($selectCommand)){
+                  $list_duplicate = $this->getDuplicateContact('',$primary_phone,$id);
+                  return array("updated"=>"The phone and email are used",'contact_duplicated'=>$list_duplicate);
+              }
+          }
+        }
+
+        /*if($duplicate==1 && $save_anyway==0){
             //print_r("save_anyway= ".$save_anyway." --".$duplicate);
             //print_r($selectCommand);die();
             if ($this->checkExists($selectCommand)){
                 $list_duplicate = $this->getDuplicateContact($primary_email,$primary_phone,$id);
                 return array("updated"=>"The phone and email are used",'contact_duplicated'=>$list_duplicate);
             }
-        }
+        }*/
         if(empty($contact_salesman_id)) $contact_salesman_id=0;
 
         $license_exp=$this->dateYmd($license_exp);
@@ -855,20 +1051,26 @@ class Contact extends Common{
             }
 
             $user_err = $this->updateUser($id,$contact_inactive,$contact_type);
+
+            $p= stripos($contact_type,"Driver");
+            if(is_numeric($p)){
+                $this->add_update_driver($id);
+            }else{
+                $table = "driver";
+                $arr_primay_key = array("contact_id"=>$id);
+                $arr_value = array("active"=>0);
+                $this->update_table($table,$arr_primay_key,$arr_value);
+            }
             //update notes table
             $notes_err=array();
             if(is_array($notes)){
                 $notes_err= $this->update_notes_new($notes,$id);
             }
-
             //update doc
             $doc_err=array();
             if(is_array($doc)){
                 $doc_err = $this->updateDoc($doc,"contactID",$id);
             }
-
-
-
             //update salesman and affiliate table
 			//update employee type table
             $this->updateSalesman($id,$active_salesman,$area);
@@ -1065,7 +1267,8 @@ class Contact extends Common{
         area,
         sms_api_username,
         sms_api_key,
-        license_exp,w9_exp,insurrance_exp
+        license_exp,w9_exp,insurrance_exp,
+        driver_avatar
         from contact_detail
         where ID = '{$ID}'";
 
@@ -1152,7 +1355,7 @@ class Contact extends Common{
     //------------------------------------------------------------
     public function OrderTotalRecords($filters=null,$filterAll=null)
     {
-        $sqlText = "Select * From orders";
+        $sqlText = "Select * From quote";
         $criteria = "";
 
         if(!empty($filterAll)){
@@ -1200,7 +1403,7 @@ class Contact extends Common{
     //------------------------------------------------------------
     public function searchOderList($filters=null,$filterAll=null,$orderClause=null, $limit,$offset)
     {
-        $sqlText = "Select * From orders";
+        $sqlText = "Select * From quote";
         $criteria = "";
 
         if(!empty($filterAll)){
@@ -1289,7 +1492,7 @@ class Contact extends Common{
         //c.contact_type,
         //get salesman belong to $idlogin
         $salesman_query = "Select DISTINCT c.ID,c.first_name,c.last_name,c.primary_email,c.primary_phone,c.primary_city,c.primary_state,c.primary_postal_code,c.contact_inactive
-         From orders_short o
+         From quote_short o
          Inner Join contact_short as c ON o.s_ID = c.ID";
 
         $criteria = "";
@@ -1341,7 +1544,7 @@ class Contact extends Common{
         ///
         $sql = "Select DISTINCT c.ID,c.first_name,c.last_name,c.primary_email,c.primary_phone,c.primary_city,c.primary_state,
                           c.primary_postal_code,c.contact_inactive
-                         From orders_short o
+                         From quote_short o
                          Inner Join contact_short as c ON o.s_ID = c.ID
                          where o.b_ID = '{$idlogin}' AND c.contact_inactive = 0
                          AND ".$interval;
@@ -1719,9 +1922,7 @@ class Contact extends Common{
         }
         return $list;
     }
-
     //------------------------------------------------------------
-
    /* public function contactList_Search($contact_name=null)
     {
         if(!empty($contact_name)) $contact_name =trim($contact_name);
@@ -1750,14 +1951,15 @@ class Contact extends Common{
     } */
 
     //------------------------------------------------------------
-
     public function contactList_Search($contact_name=null)
     {
         if(!empty($contact_name)) $contact_name =trim($contact_name);
         $sqlText = "Select distinct ID as id,c_name_company  as text
 
          From contact_short
-        where contact_inactive = 0 AND contact_name LIKE '{$contact_name}%'";
+         where contact_inactive = 0 AND (contact_name LIKE '%{$contact_name}%' OR
+          primary_email LIKE '%{$contact_name}%' OR primary_phone LIKE '%{$contact_name}%'
+          OR company_name LIKE '%{$contact_name}%')";
 
         $sqlText .= " ORDER BY ID ASC";
 
@@ -1772,7 +1974,6 @@ class Contact extends Common{
         return $list;
     }
     //------------------------------------------------------------
-
     public function contactListForGroup($contact_name=null,$unit=null)
     {
         if(!empty($contact_name)) $contact_name =trim($contact_name);
@@ -1781,9 +1982,9 @@ class Contact extends Common{
          From contact_short";
 
         if($unit=='SystemAdmin'){
-            $sqlText .= " where contact_inactive = 0  AND contact_name LIKE '{$contact_name}%'";
+            $sqlText .= " where contact_inactive = 0  AND contact_name LIKE '%{$contact_name}%'";
         }else{
-            $sqlText .= " where contact_inactive = 0 AND (contact_type like '%{$unit}%' || contact_type like '%SystemAdmin%') AND contact_name LIKE '{$contact_name}%'";
+            $sqlText .= " where contact_inactive = 0 AND (contact_type like '%{$unit}%' || contact_type like '%SystemAdmin%') AND contact_name LIKE '%{$contact_name}%'";
         }
 
         $sqlText .= " ORDER BY ID ASC";
@@ -2414,14 +2615,36 @@ class Contact extends Common{
     }
 
     //------------------------------------------------------------------
+    public function getDuplicateContact_secondphone($phone,$contactID= null){
+        $primary_phone1 = $this->format_phone($phone);
+       if(!empty($phone)){
+            $query ="SELECT contact_id as ID FROM `contact_second_phone` WHERE
+                        `second_phone` ='{$phone}' || `second_phone` ='{$primary_phone1}'";
+
+            if(!empty($contactID) && is_numeric($contactID)){
+                $query .=" AND contact_id <>$contactID";
+            }
+
+        }
+
+        $result = mysqli_query($this->con,$query);
+
+        $list=array();
+        if($result){
+            while ($row = mysqli_fetch_assoc($result)) {
+                $list[]= $row;
+            }
+        }
+        return $list;
+    }
+
+    //------------------------------------------------------------------
     public function getDuplicateContact($email,$phone,$contactID= null){
         $primary_phone1 = $this->format_phone($phone);
         if(!empty($phone) && !empty($email)){
             $query ="SELECT ID,first_name,last_name FROM contact WHERE
-                        ((`primary_phone` ='{$phone}' || `primary_phone` ='{$primary_phone1}') AND
-                          primary_phone IS NOT NULL AND primary_phone <>'') AND
-                          (`primary_email` ='{$email}' AND
-                          primary_email IS NOT NULL AND primary_email <>'')";
+                        (`primary_phone` ='{$phone}' || `primary_phone` ='{$primary_phone1}') AND
+                          (`primary_email` ='{$email}')";
 
             if(!empty($contactID) && is_numeric($contactID)){
                 $query .=" AND ID<>$contactID";
@@ -2429,9 +2652,7 @@ class Contact extends Common{
 
         }elseif(!empty($email) && empty($phone)){
             $query ="SELECT ID,first_name,last_name FROM contact WHERE
-                          (`primary_email` ='{$email}' AND
-                          primary_email IS NOT NULL AND primary_email <>'') AND
-                          (primary_phone IS NULL OR primary_phone='')";
+                          `primary_email` ='{$email}'";
 
             if(!empty($contactID) && is_numeric($contactID)){
                 $query .=" AND ID<>$contactID";
@@ -2439,9 +2660,7 @@ class Contact extends Common{
 
         }elseif(empty($email) && !empty($phone)){
             $query ="SELECT ID,first_name,last_name FROM contact WHERE
-                        ((`primary_phone` ='{$phone}' || `primary_phone` ='{$primary_phone1}') AND
-                          primary_phone IS NOT NULL AND primary_phone <>'') AND
-                          (primary_email IS NULL OR primary_email='')";
+                        `primary_phone` ='{$phone}' || `primary_phone` ='{$primary_phone1}'";
 
             if(!empty($contactID) && is_numeric($contactID)){
                 $query .=" AND ID<>$contactID";
@@ -2695,6 +2914,153 @@ class Contact extends Common{
 
         }
         return $ID;
+    }
+
+    //------------------------------------------------------------
+    public function searchDriver($text_search,$level=null,$login_id=null){
+        if($level =='') return array();
+
+        $sql = "Select concat(first_name,' ',middle_name ,' ',last_name) AS text, ID as id,
+        primary_street_address1,primary_phone,primary_email,driver_rate,driver_min_rate
+        From `contact_detail`
+        where contact_inactive =0 AND contact_type like '%Driver%' AND
+        (first_name LIKE '%{$text_search}%' OR
+        middle_name LIKE '%{$text_search}%' OR
+        last_name LIKE '%{$text_search}%' OR
+        primary_street_address1 LIKE '%{$text_search}%' OR
+        primary_email LIKE '%{$text_search}%' OR
+        primary_phone LIKE '%{$text_search}%')";
+
+        $continue = " AND ";
+        if($level !='Admin' && $login_id !=''){
+            $sql .=  $continue."ID = '{$login_id}'";
+        }
+        //die($sql);
+        $result = mysqli_query($this->con,$sql);
+
+        $list = array();
+        if($result){
+            while ($row = mysqli_fetch_assoc($result)) {
+                $list[] = $row;
+            }
+        }
+        return $list;
+    }
+
+      //-------------------------------------------------
+    public function delete_driver($contact_id){
+        $query = "DELETE FROM driver WHERE contact_id ='{$contact_id}'";
+        mysqli_query($this->con,$query);
+    }
+
+    //-------------------------------------------------
+    public function add_update_driver($contact_id,$driver_id = null ,$driver_rate = null,
+                                      $driver_avatar=null,$driver_min_rate =null,
+                                      $driver_description=null){
+        $driver_id_temp = $this->return_id("SELECT driver_id FROM driver WHERE contact_id ='{$contact_id}'","driver_id");
+        if(empty($driver_id_temp)){
+            $fields ="";
+            $values ="";
+            if($driver_rate !=''){
+                $fields = ($fields =='')?"driver_rate":$fields.",driver_rate";
+                $values = ($values =='')?"'{$driver_rate}'":$values.",'{$driver_rate}'";
+            }
+            if($driver_min_rate !=''){
+                $fields = ($fields =='')?"driver_min_rate":$fields.",driver_min_rate";
+                $values = ($values =='')?"'{$driver_min_rate}'":$values.",'{$driver_min_rate}'";
+            }
+            if($driver_avatar !=''){
+                $fields = ($fields =='')?"driver_avatar":$fields.",driver_avatar";
+                $values = ($values =='')?"'{$driver_avatar}'":$values.",'{$driver_avatar}'";
+            }
+            if($driver_description !=''){
+                $fields = ($fields =='')?"driver_description":$fields.",driver_description";
+                $values = ($values =='')?"'{$driver_description}'":$values.",'{$driver_description}'";
+            }
+
+            if($contact_id !=''){
+                $fields = ($fields =='')?"contact_id":$fields.",contact_id";
+                $values = ($values =='')?"'{$contact_id}'":$values.",'{$contact_id}'";
+                $query = "INSERT INTO `driver` ({$fields}) VALUES({$values})";
+                //die($query);
+                mysqli_query($this->con,$query);
+                $driver_id = mysqli_insert_id($this->con);
+                $err = mysqli_error($this->con);
+                if($err){
+                    return $err;
+                }else{
+                    return $driver_id;
+                }
+            }
+        }else{
+            $fields = " active ='1'";
+            if($driver_avatar !=''){
+                $fields .= ",driver_avatar ='{$driver_avatar}'";
+            }
+            if($driver_rate !=''){
+                $fields .=",driver_rate = '{$driver_rate}'";
+            }
+            if($driver_rate !=''){
+                $fields .=",driver_min_rate = '{$driver_min_rate}'";
+            }
+            if($driver_description !=''){
+                $fields .=",driver_description = '{$driver_description}'";
+            }
+            $query = "UPDATE `driver`
+                SET $fields WHERE ";
+            if($contact_id !=''){
+                $query .= " contact_id ='{$contact_id}'";
+            }else{
+                $query .= " driver_id ='{$driver_id_temp}'";
+            }
+
+            //die($query);
+            $update = mysqli_query($this->con,$query);
+            $err = mysqli_error($this->con);
+            if($err){
+                return $err;
+            }else{
+                return 1;
+            }
+        }
+    }
+    //-------------------------------------------------
+    public function get_driver($contact_id){
+        $query = "SELECT * FROM driver_short WHERE contact_id ='{$contact_id}'";
+
+        $result = mysqli_query($this->con,$query);
+        $list = array();
+        if($result){
+            while ($row = mysqli_fetch_assoc($result)) {
+                $list = $row;
+            }
+        }
+        return $list;
+    }
+
+    //------------------------------------------------------------
+
+    public function contact_search($contact_name=null)
+    {
+        if(!empty($contact_name)) $contact_name =trim($contact_name);
+        $sqlText = "Select distinct ID as id,f_m_lname  as text,
+        primary_email as email, primary_phone as phone,address
+
+         From contact_short
+         where contact_inactive = 0 AND (contact_name LIKE '%{$contact_name}%' OR
+          primary_email LIKE '%{$contact_name}%' OR primary_phone LIKE '%{$contact_name}%')";
+
+        $sqlText .= " ORDER BY ID ASC";
+
+        $result = mysqli_query($this->con,$sqlText);
+
+        $list = array();
+        if($result){
+            while ($row = mysqli_fetch_assoc($result)) {
+                $list[] = $row;
+            }
+        }
+        return $list;
     }
     //////////////////////////////
 }

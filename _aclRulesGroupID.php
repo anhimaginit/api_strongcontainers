@@ -7,7 +7,7 @@ header('Access-Control-Allow-Credentials: true');
 include_once './lib/class.group.php';
     $Object = new Group();
 
-    $EXPECTED = array('token','ID','role','department');
+    $EXPECTED = array('token','ID','department');
 
     foreach ($EXPECTED AS $key) {
         if (!empty($_POST[$key])){
@@ -24,6 +24,7 @@ include_once './lib/class.group.php';
     }else{
         $result = $Object->aclRule_grpID($ID);
         if($result['acl'] ==0 || count($result)==0){
+            $role= $_POST["'role'"];
             $result = $Object->getACLUnitLevel($department,$role);
         }else{
             /*$process[0] = $Object->getACLUnitLevel($department,$role);

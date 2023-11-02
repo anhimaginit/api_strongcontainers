@@ -533,7 +533,7 @@ require_once __DIR__ . '/lib/vendor_Mpdf/autoload.php';
                         //$id_tracking = $Object->insertTrackingEmail($to_email,$subject,$agentEmailContent1,$from_id,$status);
 
                         if(empty($status) && !empty($total)){
-                            //$is_send =  $Object->mail_to($from_name,$to_name,$to_email,$subject,$agentEmailContent,$id_tracking);
+                            $is_send =  $Object->mail_to($from_name,$to_name,$to_email,$subject,$agentEmailContent,$id_tracking);
                             if($is_send==1){
                                // $Object->updateTrackEmail($id_tracking,$status="Sent",$opened="Unopened");
                             }

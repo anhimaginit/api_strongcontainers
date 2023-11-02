@@ -3,7 +3,7 @@ require_once 'class.common.php';
 require_once 'class.salesman.php';
 require_once 'class.affiliate.php';
 
-include_once 'config.php';
+include_once 'jwtconfig.php';
 include_once 'php-jwt/BeforeValidException.php';
 include_once 'php-jwt/ExpiredException.php';
 include_once 'php-jwt/SignatureInvalidException.php';
@@ -14,21 +14,24 @@ use \Firebase\JWT\JWT;
 class Login extends Common{
     //------------------------------------------------------------
     public function loginEmailPass($login_type,$email,$phone,$zipcode,$user_name=null,$pass=null,$type=null){
+        //----------------------------------------------
         $query="";
         $type1=$type;
         if($type =="PolicyHolder")  $type1 ="Policy Holder";
         $list = array();
         if($login_type==1){
-            $query ="Select * from contact
-                Where contact.primary_email ='{$email}' AND contact.contact_inactive=0 AND contact.primary_phone = '{$phone}'
+            $query ="Select `contact`.*, driver_rate,driver_avatar from `contact`
+                 left join driver on driver.contact_id  = `contact`.ID
+                 Where contact.primary_email ='{$email}' AND contact.contact_inactive=0 AND contact.primary_phone = '{$phone}'
                  AND contact.contact_type like '%{$type1}%' LIMIT 1";
-
         }elseif($login_type==2){
-            $query ="Select * from contact
-                Where contact.primary_email ='{$email}' AND contact.contact_inactive=0 AND contact.primary_postal_code = '{$zipcode}'
+            $query ="Select `contact`.*, driver_rate,driver_avatar from `contact`
+                  left join driver on driver.contact_id  = `contact`.ID
+                  Where contact.primary_email ='{$email}' AND contact.contact_inactive=0 AND contact.primary_postal_code = '{$zipcode}'
                   AND contact.contact_type like '%{$type1}%' LIMIT 1";
         }elseif($login_type==3){
-            $query ="Select * from contact
+            $query ="Select `contact`.*, driver_rate,driver_avatar from `contact`
+                left join driver on driver.contact_id  = `contact`.ID
                 Where contact.primary_postal_code ='{$zipcode}' AND contact.contact_inactive=0 AND contact.primary_phone = '{$phone}'
                  AND contact.contact_type like '%{$type1}%' LIMIT 1";
         }
@@ -40,34 +43,34 @@ class Login extends Common{
                   c.last_name,c.middle_name,c.primary_city,c.primary_email,
                   c.primary_phone,c.primary_phone_ext,c.primary_phone_type,
                   c.primary_postal_code,c.primary_state,c.primary_street_address1,
-                  c.primary_street_address2,c.primary_website,c.sms_api_key,c.sms_api_username,c.submit_by
-                from contact as c
+                  c.primary_street_address2,c.primary_website,c.sms_api_key,c.sms_api_username,c.submit_by,
+                  driver_rate,driver_avatar
+                from `contact` as c
                 left join users as u on u.userContactID = c.ID
+                left join driver on driver.contact_id  = c.ID
                 Where c.primary_email ='{$email}' AND c.contact_inactive=0
                 AND c.contact_type like '%{$type1}%' LIMIT 1";
             }else{
                 $query = $this->checkContactIsSystemAdmin($email);
-
                 if(empty($query)){
                     return $list;
                 }
             }
-
         }else{
             return $list;
         }
-
+        //die($query);
         $result = mysqli_query($this->con,$query);
-
         if($result){
             while ($row = mysqli_fetch_assoc($result)) {
                 $list[] = $row;
             }
-
             if(count($list)>0){
                 unset($list[0]['password']);
-
-                $rsl_token = $this->loginGenerateToken1($list[0]['ID'],$list[0]['first_name'],$list[0]['last_name'],$list[0]['primary_email'],$type);
+                require_once 'class.acl.php';
+                $obj_acl = new ACL();
+                $rsl_token = $obj_acl->get_acl_token($list[0]['ID'],$list[0]['first_name'],$list[0]['last_name'],$list[0]['primary_email'],$type);
+                //$rsl_token = $this->loginGenerateToken1($list[0]['ID'],$list[0]['first_name'],$list[0]['last_name'],$list[0]['primary_email'],$type);
 
                 if(count($rsl_token)>0){
                     $list[0]["jwt"] = $rsl_token[0]['jwt'];
@@ -148,7 +151,7 @@ class Login extends Common{
     //------------------------------------------------------------
     public function checkContactIsSystemAdmin($email){
         $query ="Select DISTINCT COUNT(*)
-                from contact as c
+                from `contact` as c
                 left join users as u on u.userContactID = c.ID
                 Where c.primary_email ='{$email}'  AND c.contact_inactive=0
                 AND c.contact_type like '%SystemAdmin%' LIMIT 1";
@@ -159,7 +162,7 @@ class Login extends Common{
         if($num<1){
             //does ContactID  belong to Systemadmin unit?
             $query ="Select DISTINCT c.ID
-                from contact as c
+                from `contact` as c
                 left join users as u on u.userContactID = c.ID
                 Where c.primary_email ='{$email}' AND c.contact_inactive=0
                 LIMIT 1";
@@ -174,7 +177,7 @@ class Login extends Common{
                 }
 
                 if(!empty($ID_Contact)){
-                    $roles_Q ="Select count(*) from groups
+                    $roles_Q ="Select count(*) from `groups`
             Where department ='SystemAdmin' AND JSON_SEARCH(`users`, 'all', '{$ID_Contact}') IS NOT NULL";
 
                     $isSystemAdmin = $this->totalRecords($roles_Q,0);
@@ -186,9 +189,11 @@ class Login extends Common{
                   c.last_name,c.middle_name,c.primary_city,c.primary_email,
                   c.primary_phone,c.primary_phone_ext,c.primary_phone_type,
                   c.primary_postal_code,c.primary_state,c.primary_street_address1,
-                  c.primary_street_address2,c.primary_website,c.submit_by
-                from contact as c
+                  c.primary_street_address2,c.primary_website,c.submit_by,
+                  driver_rate,driver_avatar
+                from `contact` as c
                 left join users as u on u.userContactID = c.ID
+                left join driver on driver.contact_id  = c.ID
                 Where c.ID ='{$ID_Contact}'  AND c.contact_inactive=0
                  LIMIT 1";
                     }
@@ -201,9 +206,11 @@ class Login extends Common{
                   c.last_name,c.middle_name,c.primary_city,c.primary_email,
                   c.primary_phone,c.primary_phone_ext,c.primary_phone_type,
                   c.primary_postal_code,c.primary_state,c.primary_street_address1,
-                  c.primary_street_address2,c.primary_website,c.submit_by
-                from contact as c
+                  c.primary_street_address2,c.primary_website,c.submit_by,
+                  driver_rate,driver_avatar
+                from `contact` as c
                 left join users as u on u.userContactID = c.ID
+                left join driver on driver.contact_id  = c.ID
                 Where c.primary_email ='{$email}' AND c.contact_inactive=0
                 AND c.contact_type like '%SystemAdmin%' LIMIT 1";
         }

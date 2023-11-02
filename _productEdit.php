@@ -1,3 +1,5 @@
+
+
 <?php
 $origin=isset($_SERVER['HTTP_ORIGIN'])?$_SERVER['HTTP_ORIGIN']:$_SERVER['HTTP_HOST'];
 header('Access-Control-Allow-Origin: '.$origin);
@@ -13,7 +15,9 @@ include_once '_qbviacurl.php';
         'prod_class','prod_cost','prod_desc','prod_desc_short',
         'prod_height','prod_inactive','prod_length','prod_name','prod_price',
         'prod_type','prod_visible','prod_weight','prod_width',
-        'SKU','product_updated','prod_file_name','prod_internal_visible','jwt','private_key');
+        'SKU','product_updated','prod_file_name','prod_internal_visible',
+        'depot_id','container_type_id',
+        'jwt','private_key');
 
     foreach ($EXPECTED AS $key) {
         if (!empty($_POST[$key])){
@@ -109,8 +113,10 @@ include_once '_qbviacurl.php';
                                     $flag = in_array($extension,[ 'jpg', 'jpeg', 'gif', 'png', 'pdf','JPG', 'JPEG','PNG']);
 
                                     if($flag){
-                                        $name ="/photo/products/".uniqid()."_".$prod_file_name;
-                                        $photoPathTemp = $_SERVER["DOCUMENT_ROOT"].$name; //'.'.$extension;
+                                        $prod_file_name =uniqid()."_".$prod_file_name;
+                                        $name ="/photo/products/".$prod_file_name;
+                                        //$photoPathTemp = 'C:/xampp/htdocs/CRMAPI/'.$name;
+                                        $photoPathTemp = $_SERVER["DOCUMENT_ROOT"].$name;
                                         $imageData = base64_decode($imageData);
                                         $upload = file_put_contents($photoPathTemp, $imageData);
                                     }
@@ -135,14 +141,15 @@ include_once '_qbviacurl.php';
 
                     if(is_numeric($upload)){
                         $upload ="SUCCESS";
-                        $photoPath = $name;
+                        $photoPath = $prod_file_name;
                     }
 
                     //true continue to create new product
                     $result = $Object->updateProduct($ID,$product_notes,$product_tags,$product_taxable,$product_updated_by,$prod_class,
                         $prod_cost,$prod_desc,$prod_desc_short,$prod_height,$prod_inactive,
                         $prod_length,$prod_name,$prod_price,$prod_type,
-                        $prod_visible, $prod_weight,$prod_width,$SKU,$product_updated,$photoPath,$prod_internal_visible);
+                        $prod_visible, $prod_weight,$prod_width,$SKU,$product_updated,$photoPath,$prod_internal_visible,
+                        $depot_id,$container_type_id);
 
                     //die($ID);
                     if($result && is_numeric($result)){

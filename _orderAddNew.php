@@ -9,7 +9,8 @@ include_once '_qbviacurl.php';
     $Object = new Orders();
 
     $EXPECTED = array('token','balance','bill_to','note','payment','salesperson','total','warranty','order_title','jwt',
-        'private_key','order_total','discount_code','order_create_by','contract_overage','grand_total');
+        'private_key','order_total','discount_code','order_create_by','contract_overage','grand_total',
+        'order_doors','order_releases');
 
     foreach ($EXPECTED AS $key) {
         if (!empty($_POST[$key])){
@@ -49,7 +50,11 @@ include_once '_qbviacurl.php';
             $errObj = $Object->validate_order_fields($token,$bill_to,$salesperson);
             if(!$errObj['error']){
                 $value_Array = $_POST['products_ordered'];
-
+                //echo "<pre>";print_r($value_Array);echo "</pre>"; die();
+                $container = array();
+                if(isset($_POST["data_post"])) $container =$_POST["data_post"];
+               // echo "<pre>";print_r($container);echo "</pre>";
+                //die();
                 if(empty($order_total)) $order_total=0;
 
                 if(empty($salesperson)) $salesperson=0;
@@ -105,10 +110,27 @@ include_once '_qbviacurl.php';
                     $result ="Total or Balance must be greater than 0";
                 //}else{
                     if(empty($order_create_by)) $order_create_by=$private_key;
+                //create quote temp
+                $result ='';
+                $contract_overage =0;
+                if(count($container) >0){
+                    $rsl = $Object->quote_new_direct($bill_to,$container);
+                    if($rsl['quote_temp_id'] !='' && is_numeric($rsl['quote_temp_id'])){
+                        $result = $Object->addOrder($value_Array,
+                            $balance,$bill_to,$note,$payment,
+                            $salesperson,$total,$warranty,$notes,$order_title,$subscription,
+                            $discount_code,$order_create_by,$contract_overage,$grand_total,
+                            $rsl['quote_temp_id'],$container,
+                            $order_doors,$order_releases);
+                    }else{
+                        $result ="Error";
+                    }
+                }else{
                     $result = $Object->addOrder($value_Array,
                         $balance,$bill_to,$note,$payment,
-                        $salesperson,$order_total,$warranty,$notes,$order_title,$subscription,
+                        $salesperson,$total,$warranty,$notes,$order_title,$subscription,
                         $discount_code,$order_create_by,$contract_overage,$grand_total);
+                }
                // }
 
                 if(is_numeric($result) && $result){
@@ -134,10 +156,10 @@ include_once '_qbviacurl.php';
 
                     $payment=0; $invoice_payment=0; $ledger =array();
                     $invID = $Object->autoAddInvoice($balance,$customer,$invoiceid,$order_id,$payment,
-                        $salesperson,$order_total,$ledger,$notes,$invoice_payment,$billingDate);
+                        $salesperson,$total,$ledger,$notes,$invoice_payment,$billingDate);
                     //quicbook
                     $rsl_customer='';
-                    $customer_data = $Object->returnCustomerInfo_contactID($bill_to);
+                    /*$customer_data = $Object->returnCustomerInfo_contactID($bill_to);
                     if(count($customer_data)>0){
                         $curlObj= new QBviaCurl();
                         $url = "_qbCreateCustmer.php";
@@ -172,8 +194,6 @@ include_once '_qbviacurl.php';
                     //create quickbook invoice
                     $curlObj= new QBviaCurl();
                     $url = "_qbCreateInvoice.php";
-                    $ItemName = $prod_name;
-                    $UnitPrice = $prod_price;
 
                     $data = array(
                         "contactID"=>$customer,
@@ -183,9 +203,10 @@ include_once '_qbviacurl.php';
                     $qbInfo=$curlObj->httpost_curl($url,$data);
                     unset($curlObj);
                     $qbInfo_decode = json_decode($qbInfo,true);
-                    $ret = array('AUTH'=>true,'SAVE'=>'SUCCESS','ERROR'=>'','ID'=>$result,'invID'=>$invID,'rsl_emp'=>$rsl_customer,'qbInvoiceID'=>$qbInfo_decode['CreatedId']);
+                    */
+                   // $ret = array('AUTH'=>true,'SAVE'=>'SUCCESS','ERROR'=>'','ID'=>$result,'invID'=>$invID,'rsl_emp'=>$rsl_customer,'qbInvoiceID'=>$qbInfo_decode['CreatedId']);
                     //
-                  //  $ret = array('AUTH'=>true,'SAVE'=>'SUCCESS','ERROR'=>'','ID'=>$result,'invID'=>$invID,'rsl_emp'=>$rsl_customer);
+                    $ret = array('AUTH'=>true,'SAVE'=>'SUCCESS','ERROR'=>'','ID'=>$result,'invID'=>$invID);
 
                 } else {
                     //log errors

@@ -1,5 +1,6 @@
 <?php
 require_once 'class.common.php';
+require_once 'class.acl.php';
 class Group extends Common{
     protected $grs = array();
     protected $grs_belongto = array();
@@ -167,7 +168,7 @@ class Group extends Common{
     public function groupsByUnit($unit){
         $unit = strtolower($unit);
 
-        $select = "Select * from groups
+        $select = "Select * from `groups`
         where LOWER(department) = '{$unit}'";
 
         $result = mysqli_query($this->con,$select);
@@ -211,19 +212,19 @@ class Group extends Common{
         if(empty($parent_id)){
             $parent_id=0;
         }
-
-        $fields = "department,group_name,role,users,parent_group,parent_id";
-
-        $dateTemp = date("Y-m-d");
-
-        $values = "'{$department}','{$group_name}','{$role}','{$users}','{$parent_group}','{$parent_id}'";
-
-        $check ="SELECT COUNT(*) AS NUM FROM groups WHERE `department` = '{$department}' AND `group_name` ='{$group_name}'
+        $check ="SELECT COUNT(*) AS NUM FROM `groups` WHERE `department` = '{$department}' AND `group_name` ='{$group_name}'
         AND `role` ='{$role}'";
         if ($this->checkExists($check)) return "The Group doesn't already";
 
-        $insert = "INSERT INTO groups({$fields}) VALUES({$values})";
+        $obj_acl = new ACL();
+        $rule = $obj_acl->get_rule_default($role);
+        $fields = "department,group_name,role,users,parent_group,parent_id,
+        acl";
+        $values = "'{$department}','{$group_name}','{$role}','{$users}','{$parent_group}','{$parent_id}',
+        '{$rule}'";
 
+        $insert = "INSERT INTO `groups` ({$fields}) VALUES({$values})";
+        //die($insert);
         mysqli_query($this->con,$insert);
         $idRet = mysqli_insert_id($this->con);
 
@@ -247,18 +248,21 @@ class Group extends Common{
         }
         $dateTemp = date("Y-m-d");
 
-        $check ="SELECT COUNT(*) AS NUM FROM groups WHERE `department` = '{$department}' AND
+        $check ="SELECT COUNT(*) AS NUM FROM `groups` WHERE `department` = '{$department}' AND
         `group_name` ='{$group_name}' AND `role` ='{$role}' AND ID <> '{$id}'";
 
         if ($this->checkExists($check)) return "The Group doesn't already";
 
+        $obj_acl = new ACL();
+        $rule = $obj_acl->get_rule_default($role);
         $update ="UPDATE `groups`
                 SET department = '{$department}',
                 group_name = '{$group_name}',
                 role = '{$role}',
                 users = '{$users}',
                 parent_group = '{$parent_group}',
-                parent_id = '{$parent_id}'
+                parent_id = '{$parent_id}',
+                acl = '{$rule}'
 
                 where ID ='{$id}'";
 
@@ -276,10 +280,10 @@ class Group extends Common{
     public function getGroup_ID($ID) {
         $query = "SELECT DISTINCT g.department,g.group_name,g.ID,g.parent_group,g.parent_id,
         g.role,g.users,p.group_name as parent_group_name
-        FROM  groups as g
-        LEFT JOIN groups as p on p.ID=g.parent_group
+        FROM  `groups` as g
+        LEFT JOIN `groups` as p on p.ID=g.parent_group
         where g.ID = '{$ID}'";
-
+        //die($query);
         $result = mysqli_query($this->con,$query);
         $list = array();
         if($result){
@@ -302,7 +306,7 @@ class Group extends Common{
     //------------------------------------------------
     public function tasks_individual($ID){
 
-        $select = "Select * from groups
+        $select = "Select * from `groups`
         where role =JSON_SEARCH(users, 'all', '{$ID}') IS NOT NULL";
 
         $result = mysqli_query($this->con,$select);
@@ -350,7 +354,7 @@ class Group extends Common{
 
     //------------------------------------------------
     public function usersBelongGrp($id){
-    $select = "Select users from groups
+    $select = "Select users from `groups`
     where ID= '{$id}' limit 1";
     $result = mysqli_query($this->con,$select);
 
@@ -395,7 +399,7 @@ class Group extends Common{
     //------------------------------------------------
     public function deleteGrp($id){
         //check group is leave
-        $select = "Select count(*) from groups
+        $select = "Select count(*) from `groups`
         where parent_group = {$id}";
 
         $num = $this->totalRecords($select,0);
@@ -403,7 +407,7 @@ class Group extends Common{
         if($num >0){
             return "Can't delete the group";
         }else{
-            $del = "Delete from groups
+            $del = "Delete from `groups`
             where ID= {$id}";
 
             mysqli_query($this->con,$del);
@@ -660,7 +664,7 @@ class Group extends Common{
 
     //------------------------------------------------
     public function aclRule_grpID($ID) {
-        $query = "SELECT role,acl FROM  groups
+        $query = "SELECT role,acl FROM  `groups`
         where ID = '{$ID}'";
         $result = mysqli_query($this->con,$query);
         $list = array();
@@ -681,7 +685,7 @@ class Group extends Common{
     //------------------------------------------------------
     public function getACLUnitLevel($unit,$level)
     {
-        $query = "Select acl_rules from acl_rules
+        $query = "Select acl_rules from `acl_rules`
                 where level='{$level}' AND unit='{$unit}' limit 1";
 
         $rsl = mysqli_query($this->con,$query);
@@ -739,8 +743,8 @@ class Group extends Common{
         }else{
             $str_id = $arrID;
         }
-
-        $query = "Select ID,concat(first_name,' ',last_name) as name from contact
+        if($str_id =='') return array();
+        $query = "Select ID,concat(first_name,' ',last_name) as name from `contact`
                 where ID IN ({$str_id})";
         $rsl = mysqli_query($this->con,$query);
 
@@ -1386,6 +1390,28 @@ class Group extends Common{
         }else{
             return "";
         }
+    }
+
+    //------------------------------------------------
+    public function get_group_by_unit_role($role,$department){
+        $query = "SELECT *
+                  FROM `groups`
+                  where role ='{$role}' AND department ='{$department}' AND
+                  acl IS NOT NULL
+                  order by group_name ASC";
+
+        $result = mysqli_query($this->con,$query);
+        $list = array();
+        if($result){
+            while ($row = mysqli_fetch_assoc($result)) {
+                if($row["acl"] !=null && $row["acl"] !=''){
+                    $row["acl"] = json_decode($row["acl"],true);
+                }
+
+                $list[] = $row;
+            }
+        }
+        return $list;
     }
 
     /////////////////////////////////////////////////////////

@@ -115,7 +115,6 @@ include_once './lib/class.invoice.php';
                     $notes = $_POST["notes"];
                 }
 
-
                 $result = $Object->addInvoice($balance,$customer,$invoiceid,$order_id,$payment,
                     $salesperson,$total,$ledger,$notes,$invoice_payment,$billingDate);
 

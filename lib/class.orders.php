@@ -1,9 +1,9 @@
 <?php
 
 require_once 'class.common.php';
-require_once './lib/class.invoice.php';
+require_once 'class.invoice.php';
+require_once 'class.payment.php';
 class Orders extends Common{
-
     //--------------------------------------------------------------
     public function validate_order_fields($token,$bill_to,$salesperson)
     {
@@ -38,7 +38,9 @@ class Orders extends Common{
     public function addOrder($products_ordered,$balance,$bill_to,$note,$payment,
                              $salesperson,$total,$warranty,$notes,$order_title=null,
                              $subscription=null,$discount_code=null,$order_create_by=null,
-                             $contract_overage=null,$grand_total=null)
+                             $contract_overage=null,$grand_total=null,
+                             $quote_temp_id=null,$container=null,
+                             $order_doors=null,$order_releases=null)
     {
         $products =$products_ordered;
 
@@ -57,18 +59,30 @@ class Orders extends Common{
 
         $fields = "products_ordered,balance,bill_to,note,
         payment,salesperson,total,warranty,createTime,order_title,subscription,
-        discount_code,order_create_by,contract_overage,grand_total";
+        discount_code,order_create_by,contract_overage,grand_total,
+        order_status";
 
         $createTime = date("Y-m-d");
+        if($order_title==''){
+            $order_title = "ST-Order-".date('Y').$this->get_max_id("SELECT MAX(order_id) as max_id  FROM `quote` LIMIT 1","max_id");
+        }
 
         $values = "'{$prod_encode}','{$balance}','{$bill_to}','{$note}',
         '{$payment}','{$salesperson}','{$total}','{$warranty}','{$createTime}','{$order_title}',
         '{$subscription}','{$discount_code}','{$order_create_by}',
-        '{$contract_overage}','{$grand_total}'";
+        '{$contract_overage}','{$grand_total}',
+        'Open'";
+        $container_amount =0;
+        $sku='';
+        $order_sku =array();
+        if(is_array($container)){
+            foreach($container as $key=>$value){
+                $container_amount +=$value["qty"] ;
+                $sku = ($sku =="")? trim($value["prod_SKU"]): $sku.",".trim($value["prod_SKU"]);
+                array_push($order_sku,array("sku"=>trim($value["prod_SKU"]),"quantity"=>$value["qty"]));
 
-        $insertCommand = "INSERT INTO orders({$fields}) VALUES({$values})";
-
-        //print_r($insertCommand); die();
+            }
+        }
         //convert to string
         $productIDs =""; $arr_prods=array();
         foreach($products as $key=>$value){
@@ -95,6 +109,26 @@ class Orders extends Common{
         }
 
         if($isExsiting) return "The ".$prod_id. " doesn't already";
+        $order_sku = json_encode($order_sku);
+        $fields .=",available_container_amount,sku_list,order_sku";
+        $values .=",'{$container_amount}','{$sku}','{$order_sku}'";
+
+        if($quote_temp_id !=''){
+            $fields .=",quote_temp_id";
+            $values .=",'{$quote_temp_id}'";
+        }
+
+        if($order_doors !=''){
+            $fields .=",order_doors";
+            $values .=",'{$order_doors}'";
+        }
+
+        if($order_releases !=''){
+            $fields .=",order_releases";
+            $values .=",'{$order_releases}'";
+        }
+
+        $insertCommand = "INSERT INTO quote({$fields}) VALUES({$values})";
 
         mysqli_query($this->con,$insertCommand);
         $idreturn = mysqli_insert_id($this->con);
@@ -114,6 +148,134 @@ class Orders extends Common{
         }
     }
 
+//------------------------------------------------------------------
+    public function newOrderStrongContainer($products_ordered,$balance,$bill_to,$note,$payment,
+                                            $sale_id,
+                            $total,$warranty,$notes,$order_title,
+                            $contract_overage,$discount_code,
+                            $quote_temp_id,$payment_type,$tran_id)
+    {
+        $container_amount =0;
+        $sku ='';
+        $order_sku =  array();
+        if(is_array($products_ordered)){
+            foreach($products_ordered as $itm){
+               // echo "<pre>";print_r($itm);   echo "</pre>"; die();
+                $container_amount +=$itm["quantity"] ;
+                $sku = ($sku =="")? trim($itm["sku"]): $sku.",".trim($itm["sku"]);
+                array_push($order_sku,array("sku"=>trim($itm["sku"]),"quantity"=>$itm["quantity"]));
+            }
+            $prod_encode =json_encode($products_ordered) ;
+        }else{
+            $temp = json_decode($products_ordered,true);
+            foreach($temp as $itm){
+                $container_amount +=$itm["quantity"] ;
+                $sku = ($sku =="")? $itm["sku"]: $sku.",".$itm["sku"];
+                array_push($order_sku,array("sku"=>trim($itm["sku"]),"quantity"=>$itm["quantity"]));
+            }
+            $prod_encode =$products_ordered;
+        }
+
+        $order_sku =json_encode($order_sku);
+
+        $prod_encode = $this->protect($prod_encode);
+        if(empty($balance) || !is_numeric($balance)) $balance =0;
+        if(empty($payment) || !is_numeric($payment)) $payment =0;
+        if(empty($contract_overage) || !is_numeric($contract_overage)) $contract_overage =0;
+        $grand_total= $contract_overage+$total;
+
+        $fields = "products_ordered,balance,bill_to,note,payment,
+        total,order_title,
+        contract_overage,grand_total,discount_code,
+        quote_temp_id,order_status,
+        available_container_amount,sku_list,order_sku";
+
+        $values = "'{$prod_encode}','{$balance}','{$bill_to}','{$note}','{$payment}',
+        '{$total}','{$order_title}',
+        '{$contract_overage}','{$grand_total}','{$discount_code}',
+        '{$quote_temp_id}','Open',
+        '{$container_amount}','{$sku}','{$order_sku}'";
+
+       // if(!empty($warranty)) {
+           // $fields .= ",warranty";
+           // $values .=",'{$warranty}'";
+       // }
+        if($balance ==0){
+            $paid_in_full =date('Y-m-d');
+            $fields .= ",paid_in_full";
+            $values .=",'{$paid_in_full}'";
+        }
+
+         if(!empty($sale_id)) {
+             $fields .= ",salesperson";
+             $values .=",'{$sale_id}'";
+         }
+
+        $insertCommand = "INSERT INTO quote({$fields}) VALUES({$values})";
+        //die($insertCommand);
+        mysqli_query($this->con,$insertCommand);
+        $order_id = mysqli_insert_id($this->con);
+        //update products if $order_id
+        if($order_id>0){
+            //payment schedule
+            $invDate =date('Y-m-d');
+            //invoice
+            $billingDate = date("Y-m-d");
+            $ledger =array();
+            $invID = $this->autoAddInvoice($balance,$bill_to,'',$order_id,$payment,
+                '',$total,$ledger,$notes,$payment,$billingDate);
+
+            $payment_schedule_id=$this->addNewPaymentSchedule($order_id,$invDate,$total,$invID);
+            $pay_id='';
+            $ledger_id ='';
+            //pay_acc
+            if($payment > 0){
+                $objPayment = new Payment();
+                $pay_note ='Pay for invoice '.$invID;
+                $approved =1;
+                $overage =0;
+                $payment_date = date('Y-m-d H:i:s');
+                $pay_id  = $objPayment->AddPayAcct($payment,$payment_type,
+                    $pay_note,$bill_to,$approved,$invID,$order_id,$overage,$bill_to,
+                    $payment_date,$tran_id);
+
+                if(is_numeric($pay_id)){
+                    //update order
+                    /*if($payment >= $total){
+                        $closing_date  =date('Y-m-d');
+                        $objPayment->updateOrderClosingdate_order_id($order_id,$closing_date);
+                    }*/
+                    //ledger and invoice
+                    $this->updateTime_ivn($invID);
+
+                    $ledger_date =date("Y-m-d H:i:s");
+                    $ledger_note ="Pay for Invoice ".$invID;
+                    $ledger= array('ledger_credit'=>$payment,'ledger_invoice_id'=>$invID,
+                        'ledger_order_id'=>$order_id,'ledger_payment_note'=>$ledger_note,
+                        'ledger_type'=>$payment_type,'tran_id'=>$pay_id,'ledger_date'=>$ledger_date,
+                        'payment_date'=>$payment_date);
+
+                    $ledger_id = $this->create_ledger($ledger);
+
+                }
+            }
+            //note
+            $note_id ='';
+            if(count($notes) >0){
+                $err = $this->add_notes($notes,$bill_to,$order_id);
+                if(! is_numeric($err) && $err){
+                    $note_id = mysqli_error($this->con);
+                }
+            }
+
+            return array("order_id"=>$order_id,"inv_id"=>$invID,
+                "pay_id"=>$pay_id,'ledger_id'=>$ledger_id,'note_id'=>$note_id) ;
+        ////////////////
+        }else{
+            $err =mysqli_error($this->con);
+            return array("order_id"=>$err,"inv_id"=>'',"pay_id"=>'','ledger_id'=>'') ;
+        }
+    }
 
     //------------------------------------------------------------------
     //ccc.contact_type as s_contact_type,
@@ -121,30 +283,50 @@ class Orders extends Common{
     // o.ship_to,
 
     public function getOrderID($order_id) {
-
         $query = "SELECT o.discount_code,o.order_id, o.products_ordered, o.balance, o.bill_to, o.createTime,
          o.note, o.payment, o.salesperson,o.warranty,o.order_title,
          o.total, o.b_company_name, o.b_first_name, o.b_last_name, o.b_ID,o.b_primary_city,
          o.subscription,
          o.b_primary_email,
          o.b_primary_phone,o.b_primary_state,
+         o.b_primary_phone,
+         o.order_releases,
+         o.b_primary_phone,
+         o.order_doors,
+         b_address1,
+         b_primary_city,
+         b_primary_state,
          o.s_company_name,
          o.s_first_name, o.s_last_name, o.s_ID, o.s_primary_city,o.s_primary_email,
          o.s_primary_phone,o.s_primary_state,o.contract_overage,o.grand_total,
+         o.quote_temp_id,
          i.ID as ivn_id
-         FROM  orders_short as o
+
+         FROM  quote_short as o
          left join invoice as i on i.order_id = o.order_id
         WHERE o.order_id ='{$order_id}' limit 1";
-        $result = mysqli_query($this->con,$query);
         //print_r($query); die();
+        $result = mysqli_query($this->con,$query);
 
+        require_once 'class.depot.php';
+        $obj = new Depot();
         $list = array();
         if($result){
             while ($row = mysqli_fetch_assoc($result)) {
                 $row['ivn_id1'] = $this->getInvoiceOrderID($order_id);
+                $payment_temp = $this->payment_oder_id($order_id);
+                if($payment_temp == null || $payment_temp =='') $payment_temp =0;
+                $row["payment"] = $payment_temp;
+
                 if(!is_numeric($row['contract_overage'])) $row['contract_overage'] = 0;
                 if(!is_numeric($row['total'])) $row['total'] = 0;
                 $row['grand_total'] = $row['total'] + $row['contract_overage'];
+
+                if($row["quote_temp_id"] !='' && $row["quote_temp_id"] !=null){
+                    $row['quote_temp']  = $obj->getQuoteTemp_qt_id($row["quote_temp_id"]);
+                }else{
+                    $row['quote_temp'] = array();
+                }
                 $list[] = $row;
             }
         }
@@ -163,7 +345,7 @@ class Orders extends Common{
          o.grand_total,
           inv.ID,inv.invoiceid,
           inv.salesperson
-        FROM  orders as o
+        FROM  quote as o
         LEFT Join invoice as inv ON inv.order_id = o.order_id
         WHERE o.order_id ='{$order_id}'";
 
@@ -176,6 +358,11 @@ class Orders extends Common{
                     if(empty($row['grand_total'])) $row['grand_total'] = $row['total'];
                     if(empty($row['contract_overage'])) $row['contract_overage'] = 0;
 
+                    if($row["order_id"] !='' && $row["order_id"] != null){
+                        $row["payment"] = $this->payment_oder_id($row["order_id"]);
+                        if($row["payment"] == null || $row["payment"] =='') $row["payment"] =0;
+                    }
+
                     $row['total_overage'] =$this->getOverage_contactID($row['bill_to']);
                     $list[] = $row;
                 }
@@ -187,7 +374,7 @@ class Orders extends Common{
           o.contract_overage,
          o.grand_total,
           inv.ID,inv.invoiceid
-        FROM  orders as o
+        FROM  quote as o
         LEFT Join invoice as inv ON inv.order_id = o.order_id
         WHERE o.order_id ='{$order_id}' AND o.balance >0";
 
@@ -210,9 +397,11 @@ class Orders extends Common{
     }
 
     //-------------------------------------------------
-    public function updateOrder($order_id,$products_ordered,$bill_to,$note,
-                                $salesperson,$total,$warranty,$notes,$order_title=null,
-                                $subscription=null,$discount_code=null,$contract_overage=null,$grand_total=null)
+    public function update_order($order_id,$products_ordered,$data_post,
+                                 $total,$balance,$notes,
+                                 $subscription=null,$contract_overage=null,$grand_total=null,
+                                 $warranty=null,
+                                 $container=null,$quote_temp_id=null)
     {
         $products =$products_ordered;
         if(is_array($products_ordered)){
@@ -228,29 +417,59 @@ class Orders extends Common{
 
         if(!is_numeric($contract_overage)) $contract_overage=0;
         if(!is_numeric($total)) $total=0;
-        $grand_total= $contract_overage+$total ;
+        if(!is_numeric($grand_total)) $grand_total=0;
+        //$grand_total= $contract_overage+$total ;
 
-        $updateCommand = "UPDATE `orders`
+        $updateCommand = "UPDATE `quote`
                 SET products_ordered = '{$prod_encode}',
-                bill_to = '{$bill_to}',
-                note = '{$note}',
-                salesperson = '{$salesperson}',
                 total = '{$total}',
-                balance ='{$total}',
+                balance ='{$balance}',
                 warranty = '{$warranty}',
                 updateTime ='{$updateTime}',
-                order_title ='{$order_title}',
                 subscription = '{$subscription}',
-                discount_code ='{$discount_code}',
                 contract_overage ='{$contract_overage}',
-                grand_total = '{$grand_total}'
-                WHERE order_id = '{$order_id}'";
+                grand_total = '{$grand_total}'";
 
-        $selectCommand ="SELECT COUNT(*) AS NUM FROM orders WHERE `order_id` = '{$order_id}'";
+
+        $container_amount =0;
+        $sku='';
+        $order_sku =array();
+        if(is_array($container)){
+            foreach($container as $key=>$value){
+                $container_amount +=$value["qty"] ;
+                $sku = ($sku =="")? trim($value["prod_SKU"]): $sku.",".trim($value["prod_SKU"]);
+                array_push($order_sku,array("sku"=>trim($value["prod_SKU"]),"quantity"=>$value["qty"]));
+
+            }
+        }
+
+        if($order_sku !=''){
+            $order_sku = json_encode($order_sku);
+            $updateCommand .=",order_sku='{$order_sku}'";
+        }
+        if($sku !=''){
+            $updateCommand .=",sku_list='{$sku}'";
+        }
+        if($container_amount !=''){
+            $updateCommand .=",available_container_amount='{$container_amount}'";
+        }
+        if($quote_temp_id !=''){
+            $updateCommand .=",quote_temp_id='{$quote_temp_id}'";
+        }
+
+        if(count($data_post) >0){
+            foreach($data_post as $key=>$value){
+                $updateCommand = ($updateCommand=="")?$key."='{$value}'":$updateCommand.", ".$key."='{$value}'";
+            }
+        }
+
+        $updateCommand .= " WHERE order_id = '{$order_id}'";
+        //die($updateCommand);
+        $selectCommand ="SELECT COUNT(*) AS NUM FROM quote WHERE `order_id` = '{$order_id}'";
         if (!$this->checkExists($selectCommand)) return "The Order doesn't already";
 
         //get old product
-        $query = "SELECT products_ordered FROM orders Where `order_id` = '{$order_id}'";
+        $query = "SELECT products_ordered FROM quote Where `order_id` = '{$order_id}'";
         $result= mysqli_query($this->con,$query);
 
         $list = array();
@@ -306,7 +525,155 @@ class Orders extends Common{
 
         if($isExsiting) return "The ".$prod_id. " doesn't already";
         //
-        $selectCommand ="SELECT COUNT(*) AS NUM FROM orders WHERE `order_id` = '{$order_id}' AND
+        $selectCommand ="SELECT COUNT(*) AS NUM FROM quote WHERE `order_id` = '{$order_id}' AND
+        (balance <> total or (payment <> 0 AND payment IS NOT NULL)) ";
+        if ($this->checkExists($selectCommand)) return "Can not Update this Order";
+
+        $update = mysqli_query($this->con,$updateCommand);
+
+        if($update){
+            if($data_post['bill_to'] !='')
+            $err = $this->update_notes($notes,$data_post['bill_to'],$order_id);
+            if(is_numeric($err) && $err){
+                return 1;
+            }else{
+                return $err;
+            }
+
+        }else{
+            $err = mysqli_error($this->con);
+            return $err;
+        }
+
+    }
+
+    //-------------------------------------------------
+    public function updateOrder($order_id,$products_ordered,$bill_to,$note,
+                                $salesperson,$total,$warranty,$notes,$order_title=null,
+                                $subscription=null,$discount_code=null,$contract_overage=null,$grand_total=null,
+                                $container=null,$quote_temp_id=null)
+    {
+        $products =$products_ordered;
+        if(is_array($products_ordered)){
+            $prod_encode =json_encode($products_ordered) ;
+        }else{
+            $products = json_decode($products);
+            $prod_encode =$products_ordered;
+        }
+
+        $prod_encode = $this->protect($prod_encode);
+
+        $updateTime = date("Y-m-d");
+
+        if(!is_numeric($contract_overage)) $contract_overage=0;
+        if(!is_numeric($total)) $total=0;
+        $grand_total= $contract_overage+$total ;
+
+        $updateCommand = "UPDATE `quote`
+                SET products_ordered = '{$prod_encode}',
+                bill_to = '{$bill_to}',
+                note = '{$note}',
+                salesperson = '{$salesperson}',
+                total = '{$total}',
+                balance ='{$total}',
+                warranty = '{$warranty}',
+                updateTime ='{$updateTime}',
+                order_title ='{$order_title}',
+                subscription = '{$subscription}',
+                discount_code ='{$discount_code}',
+                contract_overage ='{$contract_overage}',
+                grand_total = '{$grand_total}'";
+
+
+        $container_amount =0;
+        $sku='';
+        $order_sku =array();
+        if(is_array($container)){
+            foreach($container as $key=>$value){
+                $container_amount +=$value["qty"] ;
+                $sku = ($sku =="")? trim($value["prod_SKU"]): $sku.",".trim($value["prod_SKU"]);
+                array_push($order_sku,array("sku"=>trim($value["prod_SKU"]),"quantity"=>$value["qty"]));
+
+            }
+        }
+
+        if($order_sku !=''){
+            $order_sku = json_encode($order_sku);
+            $updateCommand .=",order_sku='{$order_sku}'";
+        }
+        if($sku !=''){
+            $updateCommand .=",sku_list='{$sku}'";
+        }
+        if($container_amount !=''){
+            $updateCommand .=",available_container_amount='{$container_amount}'";
+        }
+        if($quote_temp_id !=''){
+            $updateCommand .=",quote_temp_id='{$quote_temp_id}'";
+        }
+
+        $updateCommand .= "WHERE order_id = '{$order_id}'";
+
+        $selectCommand ="SELECT COUNT(*) AS NUM FROM quote WHERE `order_id` = '{$order_id}'";
+        if (!$this->checkExists($selectCommand)) return "The Order doesn't already";
+
+        //get old product
+        $query = "SELECT products_ordered FROM quote Where `order_id` = '{$order_id}'";
+        $result= mysqli_query($this->con,$query);
+
+        $list = array();
+        if($result){
+            while ($row = mysqli_fetch_assoc($result)) {
+                $list[] = $row;
+            }
+        }
+
+        //convert $products to string
+        $productIDs =""; $arr_prods=array();
+        foreach($products as $key=>$value){
+            foreach($value as $k=>$v){
+                if($k=="id"){
+                    $arr_prods[] =$v;
+                    if(!empty($productIDs)){
+                        $productIDs = $productIDs.",".$v;
+                    }else{
+                        $productIDs = $v;
+                    }
+                }
+            }
+        }
+
+        //convert old prods to string
+        $prodIDs = ""; $old_oderid_temp=array();
+        if(count($list)>0){
+            $oderid_temp =  json_decode($list[0]['products_ordered'],true);
+            foreach($oderid_temp as $key=>$value){
+                foreach($value as $k=>$v){
+                    if($k=="id"){
+                        $old_oderid_temp[] = $v;
+                        if(!empty($prodIDs)){
+                            $prodIDs = $prodIDs.",".$v;
+                        }else{
+                            $prodIDs = $v;
+                        }
+                    }
+                }
+            }
+        }
+        //item in products has in old prods, if has removed it
+        $temp =array_diff($arr_prods, $old_oderid_temp);
+        //check products are avialable
+        $prod_id =""; $isExsiting =false;
+        foreach($temp as $item){
+            $prod_id = $item;
+            if(($this->checkProductsForOrder($item))){
+                $isExsiting = true;
+                break;
+            }
+        }
+
+        if($isExsiting) return "The ".$prod_id. " doesn't already";
+        //
+        $selectCommand ="SELECT COUNT(*) AS NUM FROM quote WHERE `order_id` = '{$order_id}' AND
         (balance <> total or (payment <> 0 AND payment IS NOT NULL)) ";
         if ($this->checkExists($selectCommand)) return "Can not Update this Order";
 
@@ -339,14 +706,14 @@ class Orders extends Common{
 
         $criteria1 =empty($criteria)?"":" AND ".$criteria;
 
-        $sqlText = "Select DISTINCT count(*) From orders_short
+        $sqlText = "Select DISTINCT count(*) From quote_short
             Where (b_ID = '{$id_login}' || order_create_by= '{$id_login}')".$criteria1;
 
         if(is_array($role)){
             $v = $this->protect($role[0]["department"]);
             $level = $this->protect($role[0]['level']);
             if($level=='Admin' && $v =='Sales' || $v=="SystemAdmin"){
-                $sqlText = "Select count(*) From orders_short";
+                $sqlText = "Select count(*) From quote_short";
 
                 if(!empty($criteria)){
                     $sqlText .= " WHERE ".$criteria;
@@ -402,7 +769,7 @@ class Orders extends Common{
         o.b_primary_state,o.s_name,s_ID,o.s_primary_city,o.s_primary_email,
 		o.s_primary_phone,o.s_primary_state,
         x.invoiceDate
-        From orders_short as o
+        From quote_short as o
         left join(
             Select p.orderID ,MAX(p.invoiceDate) as invoiceDate
             from payment_schedule_short as p
@@ -421,7 +788,7 @@ class Orders extends Common{
         o.b_primary_state,o.s_name,s_ID,o.s_primary_city,o.s_primary_email,
 		o.s_primary_phone,o.s_primary_state,o.salesperson as SID,
         x.invoiceDate
-        From orders_short as o
+        From quote_short as o
         left join(
             Select p.orderID ,MAX(p.invoiceDate) as invoiceDate
             from payment_schedule_short as p
@@ -441,7 +808,7 @@ class Orders extends Common{
         o.b_primary_state,o.s_name,s_ID,o.s_primary_city,o.s_primary_email,
 		o.s_primary_phone,o.s_primary_state,o.salesperson as SID,
         x.invoiceDate
-        From orders_short as o
+        From quote_short as o
         left join(
             Select p.orderID ,MAX(p.invoiceDate) as invoiceDate
             from payment_schedule_short as p
@@ -461,7 +828,7 @@ class Orders extends Common{
         o.b_primary_state,o.s_name,s_ID,o.s_primary_city,o.s_primary_email,
 		o.s_primary_phone,o.s_primary_state,
         x.invoiceDate
-        From orders_short as o
+        From quote_short as o
         left join(
             Select p.orderID ,MAX(p.invoiceDate) as invoiceDate
             from payment_schedule_short as p
@@ -519,7 +886,7 @@ class Orders extends Common{
         o.b_primary_state,o.s_name,s_ID,o.s_primary_city,o.s_primary_email,
 		o.s_primary_phone,o.s_primary_state,
         x.invoiceDate
-        From orders_short as o
+        From quote_short as o
         left join(
             Select p.orderID ,MAX(p.invoiceDate) as invoiceDate
             from payment_schedule_short as p
@@ -539,7 +906,7 @@ class Orders extends Common{
         o.b_primary_state,o.s_name,s_ID,o.s_primary_city,o.s_primary_email,
 		o.s_primary_phone,o.s_primary_state,
         x.invoiceDate
-        From orders_short as o
+        From quote_short as o
         left join(
             Select p.orderID ,MAX(p.invoiceDate) as invoiceDate
             from payment_schedule_short as p
@@ -562,7 +929,7 @@ class Orders extends Common{
         o.b_primary_state,o.s_name,s_ID,o.s_primary_city,o.s_primary_email,
 		o.s_primary_phone,o.s_primary_state,
         x.invoiceDate
-        From orders_short as o
+        From quote_short as o
         left join(
             Select p.orderID ,MAX(p.invoiceDate) as invoiceDate
             from payment_schedule_short as p
@@ -604,10 +971,10 @@ class Orders extends Common{
     //------------------------------------------------
     public function deleteOder($order_id)
     {
-        $deleteSQL = "DELETE FROM orders WHERE order_id = '{$order_id}' AND warranty=0";
+        $deleteSQL = "DELETE FROM quote WHERE order_id = '{$order_id}' AND warranty=0";
 
         //get old product
-        $query = "SELECT products_ordered FROM orders Where `order_id` = '{$order_id}'";
+        $query = "SELECT products_ordered FROM quote Where `order_id` = '{$order_id}'";
         $result= mysqli_query($this->con,$query);
 
         $list = array();
@@ -667,23 +1034,31 @@ class Orders extends Common{
     }
 
     //------------------------------------------------------------------
-    public function getOrderID_byBillTo($bill_to,$order_id=null,$balance=null) {
+    public function getOrderID_byBillTo($bill_to,$order_id=null,$balance=null,$inv_id =null) {
         $query = "SELECT o.discount_code,o.order_title, o.order_id, o.balance, o.bill_to,o.payment,o.total,o.warranty
-        FROM  orders as o
-        WHERE o.bill_to ='{$bill_to}' AND o.balance >0";
+        FROM  quote as o
+        WHERE o.bill_to ='{$bill_to}' AND o.balance >0 AND
+        o.order_id NOT IN(SELECT order_id FROM invoice)";
+       //print_r($query);die();
+        if( is_numeric($inv_id) && !empty($inv_id) && is_numeric($order_id) && !empty($order_id)){
+            $query = "SELECT o.discount_code,o.order_title, o.order_id, o.balance, o.bill_to,o.payment,o.total,o.warranty
+        FROM  quote as o
+        WHERE o.bill_to ='{$bill_to}' AND o.order_id ='{$order_id}' AND
+          o.order_id = (SELECT inv.order_id  FROM invoice as inv WHERE inv.ID= '{$inv_id}')";
+        }
 
         $result = mysqli_query($this->con,$query);
-        //print_r($query);
+
         $list = array();
         if($result){
             while ($row = mysqli_fetch_assoc($result)) {
                 $list[] = $row;
             }
         }
-        //
-        if($balance==0 && is_numeric($order_id) && !empty($order_id)){
+
+       /* if($balance==0 && is_numeric($order_id) && !empty($order_id)){
             $query = "SELECT DISTINCT o.discount_code,o.order_title, o.order_id, o.balance, o.bill_to,o.payment,o.total,o.warranty
-        FROM  orders as o
+        FROM  quote as o
         WHERE o.order_id ='{$order_id}' AND o.balance =0";
 
             $result = mysqli_query($this->con,$query);
@@ -693,7 +1068,7 @@ class Orders extends Common{
                     $list[] = $row;
                 }
             }
-        }
+        }*/
 
         return $list;
     }
@@ -701,7 +1076,7 @@ class Orders extends Common{
     //------------------------------------------------------------------
     public function getOrderID_shipTo($ship_to) {
         $query = "SELECT o.discount_code, o.order_id, o.balance, o.bill_to,o.payment,o.total,o.warranty,o.products_ordered, CONCAT(c.first_name,' ', c.last_name) as order_name
-        FROM  orders as o
+        FROM  quote as o
         left join contact as c on c.ID = o.bill_to
         WHERE o.ship_to ='{$ship_to}' AND o.balance >0";
 
@@ -719,7 +1094,7 @@ class Orders extends Common{
 //------------------------------------------------------------------
     public function getOrderID_shipTo_warranty($ship_to) {
         $query = "SELECT o.discount_code,o.order_id, o.balance, o.bill_to,o.payment,o.total,o.warranty,o.products_ordered
-        FROM  orders as o
+        FROM  quote as o
         WHERE o.ship_to ='{$ship_to}'";
 
         $result = mysqli_query($this->con,$query);
@@ -756,7 +1131,7 @@ class Orders extends Common{
     //------------------------------------------------------------------
     public function getOrderIDShipToWarranty($ship_to) {
         $query = "SELECT o.discount_code,o.order_id, o.balance, o.bill_to,o.payment,o.total,o.warranty, CONCAT(c.first_name,' ', c.last_name) as order_name
-        FROM  orders as o
+        FROM  quote as o
         left join contact as c on c.ID = o.bill_to
         WHERE o.ship_to ='{$ship_to}' AND JSON_SEARCH(products_ordered, 'all', 'Warranty') IS NOT NULL";
 
@@ -776,7 +1151,7 @@ class Orders extends Common{
     //------------------------------------------------------------------
     public function getOrderIDShipToWarranty_Test($ship_to) {
         $query = "SELECT o.order_id, o.products_ordered, o.balance, o.bill_to,o.payment,o.total,o.warranty, CONCAT(c.first_name,' ', c.last_name) as order_name
-        FROM  orders as o
+        FROM  quote as o
         left join contact as c on c.ID = o.bill_to
         WHERE o.ship_to ='{$ship_to}' AND JSON_SEARCH(products_ordered, 'all', 'Warranty') IS NOT NULL";
 
@@ -873,7 +1248,7 @@ class Orders extends Common{
                     $criteria = "`createTime` >= (NOW() - INTERVAL '{$j}' DAY) AND `createTime` < (NOW() - INTERVAL '{$k
                 }' DAY)";
 
-                    $query = "SELECT SUM(payment) as order_close, SUM((if(total >0,total,0)) - if(payment>0,payment,0)) as order_open FROM orders";
+                    $query = "SELECT SUM(payment) as order_close, SUM((if(total >0,total,0)) - if(payment>0,payment,0)) as order_open FROM quote";
                     if(!empty($login_id)){
                         $query .=" WHERE bill_to='{$login_id}' AND (".$criteria.")";
                     }else{
@@ -890,7 +1265,7 @@ class Orders extends Common{
                     $criteria = "`createTime` >= (NOW() - INTERVAL '{$j}' DAY) AND `createTime` < (NOW() - INTERVAL '{$k
                 }' DAY)";
 
-                    $query = "SELECT SUM(payment) as order_close, SUM((if(total >0,total,0)) - if(payment>0,payment,0)) as order_open FROM orders";
+                    $query = "SELECT SUM(payment) as order_close, SUM((if(total >0,total,0)) - if(payment>0,payment,0)) as order_open FROM quote";
                     if(!empty($login_id)){
                         $query .=" WHERE bill_to='{$login_id}' AND (".$criteria.")";
                     }else{
@@ -907,7 +1282,7 @@ class Orders extends Common{
                     $criteria = "`createTime` >= (NOW() - INTERVAL '{$j}' DAY) AND `createTime` < (NOW() - INTERVAL '{$k
                 }' DAY)";
 
-                    $query = "SELECT SUM(payment) as order_close, SUM((if(total >0,total,0)) - if(payment>0,payment,0)) as order_open FROM orders";
+                    $query = "SELECT SUM(payment) as order_close, SUM((if(total >0,total,0)) - if(payment>0,payment,0)) as order_open FROM quote";
                     if(!empty($login_id)){
                         $query .=" WHERE bill_to='{$login_id}' AND (".$criteria.")";
                     }else{
@@ -941,11 +1316,11 @@ class Orders extends Common{
     public function getOders_ProductHasWarrantyClass($warrantyID=null)
     {
         if(empty($warrantyID)){
-            $sqlText = "Select order_id, order_title From orders
+            $sqlText = "Select order_id, order_title From quote
         where (warranty=0 OR warranty IS NULL)
         AND JSON_SEARCH(products_ordered, 'all', 'Warranty') IS NOT NULL";
         }else{
-            $sqlText = "Select order_id,order_title From orders
+            $sqlText = "Select order_id,order_title From quote
         where (warranty=0 OR warranty IS NULL OR warranty='{$warrantyID}')
         AND JSON_SEARCH(products_ordered, 'all', 'Warranty') IS NOT NULL";
         }
@@ -965,11 +1340,11 @@ class Orders extends Common{
     public function getOders_ProductHasALacarteClass($warrantyID=null)
     {
         if(empty($warrantyID)){
-            $sqlText = "Select order_id,order_title From orders
+            $sqlText = "Select order_id,order_title From quote
         where (warranty=0 OR warranty IS NULL)
         AND JSON_SEARCH(products_ordered, 'all', 'A La Carte') IS NOT NULL";
         }else{
-            $sqlText = "Select order_id,order_title From orders
+            $sqlText = "Select order_id,order_title From quote
         where (warranty=0 OR warranty IS NULL OR warranty='{$warrantyID}')
         AND JSON_SEARCH(products_ordered, 'all', 'A La Carte') IS NOT NULL";
         }
@@ -991,7 +1366,7 @@ class Orders extends Common{
         $list_paid = array();
         $query ='';
         $interval="`createTime` >= ( CURDATE() - INTERVAL ".$number." DAY )";
-        //$query = "SELECT COUNT(*) as count_order FROM orders WHERE ";
+        //$query = "SELECT COUNT(*) as count_order FROM quote WHERE ";
         if(!empty($start_date) && !empty($end_date)){
             $interval= "`createTime` >= '{$start_date}'";
             $interval .= "AND `createTime` <= '{$end_date}'";
@@ -1005,14 +1380,14 @@ class Orders extends Common{
             foreach($role as $item){
                 $v = $this->protect($item["department"]);
                 if($this->protect($item['level'])=='Admin' && $v =='Sales' || $v=="SystemAdmin"){
-                    $query = "SELECT COUNT(*) as count_order FROM orders WHERE ".$interval;
+                    $query = "SELECT COUNT(*) as count_order FROM quote WHERE ".$interval;
                     break;
                 }
             }
         }*/
 
         if(empty($query)){
-            $query = "SELECT COUNT(*) as count_order FROM orders WHERE ".$interval;
+            $query = "SELECT COUNT(*) as count_order FROM quote WHERE ".$interval;
             if(!empty($login_id)){
                 $query .="AND bill_to='{$login_id}'";
             }
@@ -1047,9 +1422,13 @@ class Orders extends Common{
     }
 
     //------------------------------------------------------------------
-    public function addNewPaymentSchedule($orderID,$invDate,$initAmount){
-        $fields = "orderID,invoiceDate,invoiceID,inactive,amount";
-        $values = "'{$orderID}','{$invDate}',NULL,0,'{$initAmount}'";
+    public function addNewPaymentSchedule($orderID,$invDate,$initAmount,$inv_id=null){
+        $fields = "orderID,invoiceDate,inactive,amount";
+        $values = "'{$orderID}','{$invDate}',0,'{$initAmount}'";
+        if($inv_id !=''){
+            $fields .= ",invoiceID";
+            $values .=",'{$inv_id}'";
+        }
         $insertCommand = "INSERT INTO payment_schedule({$fields}) VALUES({$values})";
         //die($insertCommand);
         mysqli_query($this->con,$insertCommand);
@@ -1076,7 +1455,7 @@ class Orders extends Common{
     //------------------------------------------------------------------
     public function get_order_id($order_id) {
         $query = "SELECT balance,payment,total,subscription
-        FROM  orders
+        FROM  quote
         WHERE order_id ='{$order_id}'";
 
         $result = mysqli_query($this->con,$query);
@@ -1714,7 +2093,7 @@ class Orders extends Common{
     public function getSub_OrderID($order_id) {
 
         $query = "SELECT subscription,total
-        FROM  orders
+        FROM  quote
         WHERE order_id ='{$order_id}'";
         $result = mysqli_query($this->con,$query);
 
@@ -1882,9 +2261,91 @@ class Orders extends Common{
 
              mysqli_query($this->con,$updateCommand);
         }
-
     }
 
+    //------------------------------------------------------------
+    public function order_search($text_search)
+    {
+       $query = "SELECT order_id as id, order_title as text,
+       products_ordered,sku_list,
+       bill_to,payment,grand_total,order_status,order_status,
+       createTime,
+       shipping_customer_name,shipping_address,shipping_phone,email_phone
+        FROM quote_short where (order_title like '%{$text_search}%' or
+        shipping_customer_name like '%{$text_search}%' or
+        email_phone like '%{$text_search}%' or
+        shipping_phone like '%{$text_search}%' or
+        shipping_address like '%{$text_search}%')
+        AND available_container_amount >0
+        ORDER BY order_id DESC";
+
+        $result = mysqli_query($this->con,$query);
+        $list = array();
+        if($result){
+            while ($row = mysqli_fetch_assoc($result)) {
+                if($row["products_ordered"] !='' && $row["products_ordered"] !=null){
+                    $row["products_ordered"] = json_decode($row["products_ordered"],true);
+                }
+               // if($row["sku_list"] !='' && $row["sku_list"] !=null){
+                    //$row["sku_list"] = explode(",",$row["sku_list"]);
+               // }
+                $list[] = $row;
+            }
+        }
+        return $list;
+    }
+
+    //---------------------------------
+    public function updateTime_ivn($ivn_id){
+        $billingDate = date("Y-m-d");
+
+        $query = "UPDATE `invoice`
+               SET updateTime ='$billingDate'";
+
+        $query .= " WHERE ID = '{$ivn_id}'";
+        mysqli_query($this->con,$query);
+    }
+    //---------------------------------
+    public function create_ledger($ledger){
+        //create ledger
+        $ledger_credit =$ledger["ledger_credit"];
+        $ledger_invoice_id =$ledger["ledger_invoice_id"];
+        $ledger_order_id =$ledger["ledger_order_id"];
+        $ledger_payment_note =$ledger["ledger_payment_note"];
+        $ledger_type =$ledger["ledger_type"];
+        $tran_id =$ledger["tran_id"];
+        $ledger_date =$ledger['ledger_date'];
+        $payment_date =$ledger['payment_date'];
+
+        $field_lg="ledger_credit,ledger_invoice_id,ledger_order_id,
+            ledger_payment_note,ledger_type,tran_id,ledger_create_date,payment_date";
+
+        $value_lg="'{$ledger_credit}','{$ledger_invoice_id}','{$ledger_order_id}',
+            '{$ledger_payment_note}','{$ledger_type}','$tran_id','{$ledger_date}',
+            '{$payment_date}'";
+
+        $query = "INSERT INTO ledger ({$field_lg}) VALUES({$value_lg})";
+        mysqli_query($this->con,$query);
+        $lg_id = mysqli_insert_id($this->con);
+
+        return $lg_id;
+    }
+
+    //---------------------------------
+    public function quote_new_direct($bill_to,$data,$order_id=null){
+        $query ="SELECT * FROM `contact` WHERE ID ='{$bill_to}' limit 1";
+        $result = mysqli_query($this->con,$query);
+        $list = array();
+        if($result){
+            while ($row = mysqli_fetch_assoc($result)) {
+                $list = $row;
+            }
+        }
+        require_once 'class.depot.php';
+        $obj = new Depot();
+        $rsl = $obj->add_quote_temp_direct($list, $data,$order_id);
+        return $rsl;
+    }
     ///////////////////////////////////
 
 }

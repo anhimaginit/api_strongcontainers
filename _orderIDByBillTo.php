@@ -7,7 +7,7 @@ header('Access-Control-Allow-Credentials: true');
 include_once './lib/class.orders.php';
 $Object = new Orders();
 
-    $EXPECTED = array('token','bill_to','order_id');
+    $EXPECTED = array('token','bill_to','order_id','inv_id');
 
     foreach ($EXPECTED AS $key) {
         if (!empty($_POST[$key])){
@@ -21,7 +21,7 @@ $Object = new Orders();
     if(!$isAuth){
         $ret = array('ERROR'=>'Authentication is failed');
     }else{
-        if(isset($_POST['balance'])){
+        /*if(isset($_POST['balance'])){
             if(is_numeric($_POST['balance'])){
                $balance= $_POST['balance'];
                 $ret = $Object->getOrderID_byBillTo($bill_to,$order_id,$balance);
@@ -30,7 +30,8 @@ $Object = new Orders();
             }
         }else{
             $ret = $Object->getOrderID_byBillTo($bill_to);
-        }
+        }*/
+        $ret = $Object->getOrderID_byBillTo($bill_to,$order_id,'',$inv_id);
     }
 
     $Object->close_conn();

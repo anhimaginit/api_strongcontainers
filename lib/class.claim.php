@@ -1278,7 +1278,7 @@ class Claim extends Common{
                 Where order_id ='{$order_id}' AND (JSON_SEARCH(products_ordered, 'all', 'Warranty') OR
                 JSON_SEARCH(products_ordered, 'all', 'A La Carte')) IS NOT NULL";*/
 
-        $command ="select `products_ordered` from `orders`
+        $command ="select `products_ordered` from `quote`
                 Where order_id ='{$order_id}'AND (json_contains(products_ordered->'$[*].prod_class', json_array('A La Carte')) OR
  json_contains(products_ordered->'$[*].prod_class', json_array('Warranty')))";
 
@@ -1317,7 +1317,7 @@ class Claim extends Common{
     //------------------------------------------------------------------
     public function getProdByOrderID($order_id)
     {
-        $command ="select `products_ordered` from `orders`
+        $command ="select `products_ordered` from `quote`
                 Where order_id ='{$order_id}' AND JSON_SEARCH(products_ordered, 'all', 'Warranty') IS NOT NULL";
 
         $result = mysqli_query($this->con,$command);
@@ -2185,7 +2185,7 @@ class Claim extends Common{
     public function getServiceFree_order_id($order_id)
     {
         $query = "SELECT products_ordered
-        FROM orders
+        FROM quote
         Where order_id = '{$order_id}' AND (
          json_contains(products_ordered->'$[*].prod_class', json_array('Service Fee'))AND
                             products_ordered->'$[*].id' <> json_array('Select product')

@@ -13,7 +13,7 @@ class InvoiceMail extends Common{
         i.balance,i.payment,
         o.products_ordered,o.total as order_total,o.warranty as warranty_id
         FROM  invoice_short as i
-        left join orders as o on o.order_id = i.order_id
+        left join quote as o on o.order_id = i.order_id
         where invoiceid ='{$invoiceID}'";
 
         $result = mysqli_query($this->con,$query);

@@ -111,12 +111,13 @@ class Company extends Common{
       //die($command);
         $selectCommand ="SELECT COUNT(*) AS NUM FROM company WHERE  LOWER(`name`) ='{strtolower($name)}'";
        // if ($this->checkExists($selectCommand)) return array('id'=>'','com'=>'The name is used');
-
-        $selectCommand ="SELECT COUNT(*) AS NUM FROM company WHERE  `phone` ='{$phone}'";
-        if ($this->checkExists($selectCommand)) return array('id'=>'','com'=>'The phone is used');
+        if($phone !=''){
+            $selectCommand ="SELECT COUNT(*) AS NUM FROM company WHERE  `phone` ='{$phone}'";
+            if ($this->checkExists($selectCommand)) return array('id'=>'','com'=>'The phone is used','vendor'=>'','notes'=>'');
+        }
 
         $selectCommand ="SELECT COUNT(*) AS NUM FROM company WHERE  LOWER(`email`) ='{strtolower($email)}'";
-        if ($this->checkExists($selectCommand)) return array('id'=>'','com'=>'The email is used');
+        if ($this->checkExists($selectCommand)) return array('id'=>'','com'=>'The email is used','vendor'=>'','notes'=>'');
         //insert record contact table
         //die($command);
         mysqli_query($this->con,$command);
@@ -610,7 +611,7 @@ class Company extends Common{
             $sqlText = "Select DISTINCT c.ID,c.f_m_lname as name,c.primary_street_address1 as address1,
              c.primary_phone as phone,
              c.primary_city as city,c.primary_email as email,c.contact_type as type
-                            From orders_short as o
+                            From quote_short as o
                             Left Join contact_short
                              as c ON o.s_ID = c.ID
                             where o.b_ID = '{$id_login}' ".$criteria2. "
@@ -634,6 +635,32 @@ class Company extends Common{
         }
 
         //
+        return $list;
+    }
+
+    //------------------------------------------------------------------
+    public function company_search($text_search){
+        $query ="SELECT *
+        FROM `company`";
+        $where =" WHERE ";
+        if($text_search !=''){
+            $query .= $where." name like '%{$text_search}%' OR
+                    email like '%{$text_search}%' OR
+                    address1 like '%{$text_search}%' OR
+                    address2 like '%{$text_search}%') ";
+            $where =" AND ";
+        }
+
+        $query .= " order by name DESC";
+
+        $rsl = mysqli_query($this->con,$query);
+        $list = array();
+        if($rsl){
+            while ($row = mysqli_fetch_assoc($rsl)) {
+                $list[] = $row;
+            }
+        }
+
         return $list;
     }
     /////////////////////////////////////////////////////////

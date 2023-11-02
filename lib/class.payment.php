@@ -27,7 +27,7 @@ class Payment extends Common{
     //------------------------------------------------
     public function AddPayAcct($pay_amount,$pay_type,
                                $pay_note,$submit_by,$approved,$invID,$order_id,$overage,$bill_to,
-                               $payment_date)
+                               $payment_date=null,$tran_id=null)
     {
         if(empty($submit_by)) $submit_by=0;
         if(empty($approved)) $approved=0;
@@ -39,12 +39,20 @@ class Payment extends Common{
         $create_date = date('Y-m-d H:i:s');
 
         $fields = "pay_amount,pay_type,pay_note,
-        submit_by,approved,pay_date,invoice_id,order_id,overage,customer,create_date";
+        submit_by,approved,invoice_id,order_id,overage,customer,create_date";
 
         $values = "'{$pay_amount}','{$pay_type}','{$pay_note}',
-        '{$submit_by}','{$approved}','{$payment_date}','{$invID}','{$order_id}',
+        '{$submit_by}','{$approved}','{$invID}','{$order_id}',
         '{$overage}','{$bill_to}','{$create_date}'";
+        if($tran_id !=''){
+            $fields .=",pay_tran_id";
+            $values .=",'{$tran_id}'";
+        }
 
+        if($payment_date !=''){
+            $fields .=",pay_date";
+            $values .=",'{$payment_date}'";
+        }
         $insertCommand = "INSERT INTO pay_acct({$fields}) VALUES({$values})";
         //die($insertCommand);
         mysqli_query($this->con,$insertCommand);
@@ -78,7 +86,7 @@ class Payment extends Common{
     //------------------------------------------------
     public function getWarrantyStartDate_orderID($orderID){
         $query ="SELECT o.warranty,w.warranty_start_date
-		from  orders as o
+		from  quote as o
         left Join warranty as w ON w.ID = o.warranty
         Where order_id ='{$orderID}'";
 
@@ -95,8 +103,8 @@ class Payment extends Common{
 
     //------------------------------------------------
     public function getPaymentBalance_orderID($orderID){
-        $query ="SELECT balance,payment,grand_total,contract_overage,total
-		from  orders
+        $query ="SELECT balance,payment,grand_total,contract_overage,total,paid_in_full
+		from  quote
         Where order_id ='{$orderID}'";
 
         $result = mysqli_query($this->con,$query);
@@ -129,10 +137,10 @@ class Payment extends Common{
 
     //------------------------------------------------
     public function auotUpdateIVN_payacct($ID, $inv_balance,$invoice_payment,$order_id,
-                                          $payment,$balance,$ledger){
+                                          $payment,$balance,$ledger,$overage=null,$grand_total=null){
         $invObj = new Invoice();
         $info = $invObj->autoUpdateInvoice($ID, $inv_balance,$invoice_payment,$order_id,
-            $payment,$balance,$ledger);
+            $payment,$balance,$ledger,$overage,$grand_total);
 
         unset($invObj);
         return $info;
@@ -144,7 +152,7 @@ class Payment extends Common{
         if(!is_numeric($contractOverage)) $contractOverage=0;
         if(!is_numeric($grandTotal)) $grandTotal=0;
 
-        $updateCommand = "UPDATE `orders`
+        $updateCommand = "UPDATE `quote`
                 SET contract_overage = '{$contractOverage}',
                 grand_total = '{$grandTotal}'
                 WHERE order_id = '{$order_id}'";
@@ -158,7 +166,7 @@ class Payment extends Common{
     //-------------------------------------------------
     public function getOrderClosingDate_orderID($orderid){
         $query ="SELECT paid_in_full
-		from  orders
+		from  quote
         Where order_id ='{$orderid}'";
 
         $result = mysqli_query($this->con,$query);
@@ -171,10 +179,10 @@ class Payment extends Common{
 
         return $closing_date;
     }
-
+//-------------------------------------------------
     public function updateOrderClosingdate_order_id($order_id,$closing_date)
     {
-        $updateCommand = "UPDATE `orders`
+        $updateCommand = "UPDATE `quote`
                 SET paid_in_full = '{$closing_date}'
                 WHERE order_id = '{$order_id}'";
 
@@ -195,5 +203,74 @@ class Payment extends Common{
         return $update;
 
     }
+
+    //------------------------------------------------
+    public function new_pay_driver($pay_driver,$pay_amount,$pay_task,$pay_date,
+                                   $submit_by,$pay_type,$pay_note)
+    {
+        $create_date = date('Y-m-d H:i:s');
+
+        $fields = ""; $values='';
+        if($pay_driver !=''){
+            $fields .="pay_driver";
+            $values .="'{$pay_driver}'";
+        }
+
+        if($pay_amount !=''){
+        $fields .=",pay_amount";
+        $values .=",'{$pay_amount}'";
+        }
+        if($pay_task !=''){
+            $fields .=",pay_task";
+            $values .=",'{$pay_task}'";
+        }
+        if($pay_date !=''){
+            $fields .=",pay_date";
+            $values .=",'{$pay_date}'";
+        }
+        if($submit_by !=''){
+            $fields .=",submit_by";
+            $values .=",'{$submit_by}'";
+        }
+        if($pay_type !=''){
+            $fields .=",pay_type";
+            $values .=",'{$pay_type}'";
+        }
+        if($pay_note !=''){
+            $fields .=",pay_note";
+            $values .=",'{$pay_note}'";
+        }
+
+        $insertCommand = "INSERT INTO pay_for_driver({$fields}) VALUES({$values})";
+       // die($insertCommand);
+        mysqli_query($this->con,$insertCommand);
+        $idreturn = mysqli_insert_id($this->con);
+        if(is_numeric($idreturn) && $idreturn !=''){
+            return array('ERROR'=>'','SAVE'=>'SUCCESS','pay_id'=>$idreturn);
+        }
+        else {
+            array('ERROR'=>mysqli_error($this->con),'SAVE'=>'','pay_id'=>'');
+        }
+    }
+
+    //------------------------------------------------------
+    public function get_payment_task($pay_task)
+    {
+        $sqlText = "Select * From pay_for_driver
+        WHERE pay_task='{$pay_task}' order by pay_id DESC";
+
+        $result = mysqli_query($this->con,$sqlText);
+
+        $list = array();
+        if($result){
+            while ($row = mysqli_fetch_assoc($result)) {
+                $list[] = $row;
+            }
+        }
+        $total_payment =  $this->get_total_payment_task($pay_task);
+        $driver_total =  $this->return_id("SELECT driver_total FROM assign_task WHERE ID='{$pay_task}'","driver_total");
+        return array("list"=>$list,'total_payment'=>$total_payment,'driver_total'=>$driver_total);
+    }
+
     /////////////////////////////////////////////////////////
 }

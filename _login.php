@@ -29,6 +29,13 @@ header('Access-Control-Allow-Credentials: true');
     }else{
         //if($type =="PolicyHolder")  $type ="Policy Holder";
         $rsl = $Object->loginEmailPass($login_type,$primary_email,$primary_phone,$primary_postal_code,$user_name,$pass,$type);
+        //print_r($rsl);die();
+        $api_domain = $Object->api_domain;
+        $driver_avatar_path = $api_domain.$Object->driver_avatar;
+        //$driver_avatar_path ='http://localhost//CRMAPI/'.$Object->driver_avatar;
+        if($rsl[0]["driver_avatar"] !='' && $rsl[0]["driver_avatar"] !=null){
+            $rsl[0]["driver_avatar"] = $driver_avatar_path.$rsl[0]["driver_avatar"];
+        }
 
         $type_login="";
         if(!empty($primary_email)){

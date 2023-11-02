@@ -11,7 +11,7 @@ class EmailAdress{
     function __construct() {
         $this->admin_email = "marketing@freedomhw.com";
         $this->admin_name = "Admin system";
-        $this->admin_id = 0;
+        $this->admin_id = 2;
         $this->accountant_email = "marketing@at1ts.com";
         $this->accountant_name = "Accountant";
         $this->domain_path='https://salescontrolcenter.com';

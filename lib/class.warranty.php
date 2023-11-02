@@ -503,7 +503,7 @@ class Warranty extends Common{
         if($update){
             //remove warranty ID in order
             if(!empty($orderRemoveWarranty)){
-                $updateOrder2 = "UPDATE `orders`
+                $updateOrder2 = "UPDATE `quote`
                 SET warranty = 0,
                 contract_overage=0
                 WHERE order_id IN ({$orderRemoveWarranty})";
@@ -770,7 +770,7 @@ class Warranty extends Common{
 
         if($orderAlready) return "The order ".$orderID1." doesn't already.";
 
-        //only one prod_class is warranty in all orders?
+        //only one prod_class is warranty in all quote?
         $number_orderwarranty=0;
         $flagClassWarrantyProd =false; $orderID="";$order_warrantyID='';
         foreach($orderID_arr as $item){
@@ -802,7 +802,7 @@ class Warranty extends Common{
         if($update){
             //remove warranty ID in order
             if(!empty($orderRemoveWarranty)){
-                $updateOrder2 = "UPDATE `orders`
+                $updateOrder2 = "UPDATE `quote`
                 SET warranty = 0
                 WHERE order_id IN ({$orderRemoveWarranty})";
                 mysqli_query($this->con,$updateOrder2);
@@ -1112,9 +1112,9 @@ class Warranty extends Common{
     //------------------------------------------------
     public function checkOrderForWarranty($order_id,$warrantyID=null) {
         if(empty($warrantyID)){
-            $query = "SELECT count(*) FROM  orders WHERE order_id = '{$order_id}' AND warranty <> 0 LIMIT 1";
+            $query = "SELECT count(*) FROM  quote WHERE order_id = '{$order_id}' AND warranty <> 0 LIMIT 1";
         }else{
-            $query = "SELECT count(*) FROM  orders WHERE order_id = '{$order_id}' AND (warranty <> '{$warrantyID}' AND warranty <> 0) LIMIT 1";
+            $query = "SELECT count(*) FROM  quote WHERE order_id = '{$order_id}' AND (warranty <> '{$warrantyID}' AND warranty <> 0) LIMIT 1";
         }
         //die($query);
         $check = mysqli_query($this->con,$query);
@@ -1128,7 +1128,7 @@ class Warranty extends Common{
 
     //------------------------------------------------
     public function checkClassWarrantyProd($order_id) {
-        $query = "SELECT products_ordered FROM  orders WHERE order_id = '{$order_id}'";
+        $query = "SELECT products_ordered FROM  quote WHERE order_id = '{$order_id}'";
         $result= mysqli_query($this->con,$query);
 
         $list = array();
@@ -1704,7 +1704,7 @@ class Warranty extends Common{
 
     //------------------------------------------------
     public function getOrderTitle_orderID($id){
-        $query = "SELECT order_id,order_title FROM  orders
+        $query = "SELECT order_id,order_title FROM  quote
                 where order_id IN ({$id})";
         $rsl = mysqli_query($this->con,$query);
         $list = array();
@@ -1719,7 +1719,7 @@ class Warranty extends Common{
 
     //------------------------------------------------
     public function upDateOrderTitle_orderIDs($ids,$title,$warrantyID){
-        $query = "SELECT order_id,order_title FROM  orders
+        $query = "SELECT order_id,order_title FROM  quote
                 where order_id IN ({$ids})";
         $rsl = mysqli_query($this->con,$query);
         $updateOrderErr = array();
@@ -1746,7 +1746,7 @@ class Warranty extends Common{
 
     //------------------------------------------------
     public function upDateOrderTitle_warrantyID($id,$title,$warrantyID){
-        $updateOrder = "UPDATE `orders`
+        $updateOrder = "UPDATE `quote`
                 SET warranty = '{$warrantyID}',
                     order_title = '{$title}'
                 WHERE order_id = '{$id}'";
@@ -1776,7 +1776,7 @@ class Warranty extends Common{
 
 //------------------------------------------------
     public function upSubmitterOrder_warrantyID($ids,$submitter){
-        $updateOrder = "UPDATE `orders`
+        $updateOrder = "UPDATE `quote`
                 SET order_create_by = '{$submitter}'
                 WHERE order_id  IN ({$ids})";
 
@@ -1845,7 +1845,7 @@ class Warranty extends Common{
     //-----------------------get grand total and contract overage-------------------------
     public function getGrandTotalContractOverage_orderID($orderId){
         $query ="SELECT order_id,contract_overage,grand_total,total
-		from  orders
+		from  quote
         Where order_id ='{$orderId}'";
 
         $result = mysqli_query($this->con,$query);
@@ -1863,7 +1863,7 @@ class Warranty extends Common{
 
     //------------------------------------------------------------------
     public function updateGrandTotalOverage_orderID($orderID,$contract_overage,$grand_total){
-        $updateCommand = "UPDATE `orders`
+        $updateCommand = "UPDATE `quote`
                 SET contract_overage = '{$contract_overage}',
                 grand_total = '{$grand_total}'
 				 WHERE order_id = '{$orderID}'";
@@ -1880,7 +1880,7 @@ class Warranty extends Common{
     //------------------------------------------------
     public function getPaymentBalance_orderID1($orderID){
         $query ="SELECT balance,payment,grand_total,contract_overage,total
-		from  orders
+		from  quote
         Where order_id ='{$orderID}'";
 
         $result = mysqli_query($this->con,$query);

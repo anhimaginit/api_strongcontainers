@@ -39,18 +39,22 @@ class Salesman extends Common{
         where sl.active=1 AND  (sl.area =JSON_SEARCH(area, 'all', 'Corporate') IS NOT NULL )";
 
         }
-        //die($query);
         $result = mysqli_query($this->con,$query);
 
         $list = array();
         if($result){
             while ($row = mysqli_fetch_assoc($result)) {
-                $row['area']= json_decode($row['area'],true);
-                if (in_array("Corporate", $row['area'])){
-                    $row['Corporate']=1;
+                if($row['area'] != null && $row['area'] !=''){
+                    $row['area']= json_decode($row['area'],true);
+                    if (in_array("Corporate", $row['area'])){
+                        $row['Corporate']=1;
+                    }else{
+                        $row['Corporate']=0;
+                    }
                 }else{
                     $row['Corporate']=0;
                 }
+
                 unset($row['area']);
                 $list[] = $row;
             }
@@ -107,7 +111,21 @@ class Salesman extends Common{
 
         //die($query);
         $result = mysqli_query($this->con,$query);
-
+        $list = array();
+        if($result){
+            while ($row = mysqli_fetch_assoc($result)) {
+                $list[] = $row;
+            }
+        }
+        return $list;
+    }
+    //------------------------------------------------------
+    public function getDrivers(){
+        $query = "SELECT DISTINCT concat(first_name,' ',last_name) as text,ID as id
+          FROM  `contact`
+          WHERE contact_inactive=0 AND contact_type like '%Driver'";
+        //die($query);
+        $result = mysqli_query($this->con,$query);
         $list = array();
         if($result){
             while ($row = mysqli_fetch_assoc($result)) {

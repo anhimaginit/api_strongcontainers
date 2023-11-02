@@ -61,8 +61,9 @@ include_once '_qbviacurl.php';
         $isAuth = $Object->auth($jwt,$private_key);
 
         if($isAuth['AUTH']){
-            //$errObj = $Object->validate_contact_fields($first_name,$last_name,$primary_email,$primary_street_address1);
-            $errObj = $Object->validateContactFieldEmailOrPhone($primary_email,$primary_phone);
+            $errObj = $Object->validate_contact_fields($first_name,$last_name,$primary_email,$primary_street_address1,$primary_city,$primary_state);
+
+            //$errObj = $Object->validateContactFieldEmailOrPhone($primary_email,$primary_phone);
             if(!$errObj['error']){
                 if($contact_inactive=="" || empty($contact_inactive)) {
                     $contact_inactive =0;

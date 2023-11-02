@@ -38,22 +38,25 @@ class Invoice extends Common{
                              $salesperson,$total,$ledger,$notes,$invoice_payment=null,$billingDate=null,$claimID=null)
 
     {
-        $fields = "balance,customer,invoiceid,order_id,payment,salesperson,total,createTime";
-
-        $createTime = date("Y-m-d");
+        $fields = "balance,customer,invoiceid,order_id,payment,total";
+        //$createTime = date("Y-m-d");
+        $invoiceid = "ST-INV".date('Y').$this->get_max_id("SELECT MAX(ID) as max_id  FROM `invoice` LIMIT 1","max_id");
 
         $values = "'{$balance}','{$customer}','{$invoiceid}','{$order_id}',
-        '{$invoice_payment}','{$salesperson}','{$total}','{$createTime}'";
+        '{$invoice_payment}','{$total}'";
+
+        if(!empty($salesperson) && is_numeric($salesperson)){
+            $fields .=",salesperson";
+            $values .= ",'{$salesperson}'";
+        }
         if(!empty($claimID) && is_numeric($claimID)){
             $fields .=",claim_id";
             $values .= ",'{$claimID}'";
         }
         $insertCommand = "INSERT INTO invoice ({$fields}) VALUES({$values})";
-
-        /*print_r($insertCommand);
-        echo "---------";
-        print_r($ledger);
-        die();*/
+        //echo "<pre>";print_r($insertCommand);   echo "</pre>";
+        //echo "<pre>";print_r($ledger);   echo "</pre>"; die();
+        //die($insertCommand);
         $flag = false;
         if(($this->checkInvoiceNum($invoiceid))){
             $flag = true;
@@ -185,7 +188,7 @@ class Invoice extends Common{
         //get 
         // SELECT subscription FROM `orders` WHERE orderID = $orderID
         //get id
-        $query = "SELECT subscription FROM orders WHERE orderID = '{$orderID}' ";
+        $query = "SELECT subscription FROM quote WHERE orderID = '{$orderID}' ";
         $result = mysqli_query($this->con,$query);
         //print_r($query); die();
         $ordersList = array();
@@ -266,9 +269,9 @@ class Invoice extends Common{
         $id = $paymentScheduleList[0]['id'];
 
         //get 
-        // SELECT subscription FROM `orders` WHERE orderID = $orderID
+        // SELECT subscription FROM `quote` WHERE orderID = $orderID
         //get id
-        $query = "SELECT subscription FROM orders WHERE orderID = '{$orderID}' ";
+        $query = "SELECT subscription FROM quote WHERE orderID = '{$orderID}' ";
         $result = mysqli_query($this->con,$query);
         //print_r($query); die();
         $ordersList = array();
@@ -436,9 +439,9 @@ class Invoice extends Common{
          i.s_company_name,
          i.s_first_name,i.s_last_name,i.s_ID, i.s_primary_city,i.s_primary_email,
          i.s_primary_phone,i.s_primary_state,o.balance as order_balance,
-         o.contract_overage,o.grand_total
+         o.contract_overage,o.grand_total,o.total as order_total
          FROM  invoice_short as i
-         left join orders as o on o.order_id = i.order_id
+         left join quote as o on o.order_id = i.order_id
          WHERE ID ='{$ID}' LIMIT 1";
         $result = mysqli_query($this->con,$query);
 
@@ -450,6 +453,11 @@ class Invoice extends Common{
                 $row['grand_total'] = $row['total'] + $row['contract_overage'];
 
                 $row['total_overage'] =$this->getOverage_contactID($row['customer']);
+                if($row["order_id"] !='' && $row["order_id"] != null){
+                    $row["payment"] = $this->payment_oder_id($row["order_id"]);
+                    if($row["payment"] == null || $row["payment"] =='') $row["payment"] =0;
+                }
+
                 $list[] = $row;
             }
         }
@@ -646,12 +654,21 @@ class Invoice extends Common{
     }
 
     //-------------------------------------------------
-    public function updateOrder_id($order_id,$balance,$payment)
+    public function updateOrder_id($order_id,$balance,$payment,$overage=null,$grand_total=null)
     {
-        $updateCommand = "UPDATE `orders`
+        $updateCommand = "UPDATE `quote`
                 SET balance = '{$balance}',
-                payment = '{$payment}'
-                WHERE order_id = '{$order_id}'";
+                payment = '{$payment}'";
+
+        if(is_numeric($grand_total) > 0){
+            $updateCommand.=",grand_total = '{$grand_total}'";
+        }
+
+        if(is_numeric($overage) > 0){
+            $updateCommand.=",contract_overage = '{$overage}'";
+        }
+
+        $updateCommand.= " WHERE order_id = '{$order_id}'";
 
         $update = mysqli_query($this->con,$updateCommand);
 
@@ -828,7 +845,7 @@ class Invoice extends Common{
         }
 
     }
-
+   //------------------------------------------------------------
     public function invoiceDateOfLastRow_orderID($orderID){
         /*$query = "SELECT MAX(id) as id1 FROM payment_schedule
         WHERE orderID = '{$orderID}' and invoiceID IS NOT NULL";*/
@@ -880,7 +897,7 @@ class Invoice extends Common{
     //------------------------------------------------------------------
     public function getBalance_order_id($order_id) {
         $query = "SELECT balance
-        FROM  orders
+        FROM  quote
         WHERE order_id ='{$order_id}'";
 
         $result = mysqli_query($this->con,$query);
@@ -968,7 +985,7 @@ class Invoice extends Common{
 
     //-------------------------------------------------
     public function autoUpdateInvoice($ID, $inv_balance,$invoice_payment,$order_id,
-                                  $payment,$balance,$ledger)
+                                  $payment,$balance,$ledger,$overage=null,$grand_total=null)
     {
         $updateTime = date("Y-m-d");
         $billingDate = date("Y-m-d");
@@ -984,7 +1001,7 @@ class Invoice extends Common{
         //die($updateCommand);
         if($update){
             //update order
-            $update_order =$this->updateOrder_id($order_id,$balance,$payment);
+            $update_order =$this->updateOrder_id($order_id,$balance,$payment,$overage,$grand_total);
             if(!$update_order){
                 return array("updateInv"=>1,"updateOrder"=>mysqli_error($this->con),
                     "ledger_id"=>"","ledger_err"=>"") ;
