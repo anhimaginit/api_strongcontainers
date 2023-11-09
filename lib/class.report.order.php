@@ -57,6 +57,7 @@ class ReportOrder extends Common{
             while ($row = mysqli_fetch_assoc($rsl)) {
                 if($row['assign_task_id'] !=null && $row['assign_task_id'] !=''){
                     $row['driver_total_payment'] =  $this->get_total_payment_task($row['assign_task_id']);
+                    $row['pay_acct'] = $this->get_pay_acct($row['order_id']);
                 }
                 $list[] = $row;
             }
@@ -72,6 +73,24 @@ class ReportOrder extends Common{
 
         return array("list"=>$list,"row_cnt"=>$row_cnt);
 
+    }
+
+    //------------------------------------------------------
+    public function get_pay_acct($order_id)
+    {
+        $sqlText = "Select pay_date,pay_type,pay_amount,pay_note From pay_acct
+        WHERE order_id='{$order_id}'";
+
+        $result = mysqli_query($this->con,$sqlText);
+
+        $list =array();
+        if($result){
+            while ($row = mysqli_fetch_assoc($result)) {
+                $list[] = $row;
+            }
+        }
+
+        return $list;
     }
    /////////////
 }
