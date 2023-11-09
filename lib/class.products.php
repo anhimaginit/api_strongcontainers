@@ -362,9 +362,9 @@ class Products extends Common{
     public function productsForOrder($sku)
     {
         if(empty($sku)){
-            $sqlText = "Select * From products where prod_inactive = 0";
+            $sqlText = "Select * From products_short where prod_inactive = 0";
         }else{
-            $sqlText = "Select * From products where prod_inactive = 0 AND SKU like '{$sku}%'";
+            $sqlText = "Select * From products_short where prod_inactive = 0 AND SKU like '{$sku}%'";
         }
 
         $result = mysqli_query($this->con,$sqlText);
@@ -381,9 +381,9 @@ class Products extends Common{
     public function prodForOrderByName($name)
     {
         if(empty($name)){
-            $sqlText = "Select * From products where prod_inactive = '0'";
+            $sqlText = "Select * From products_short where prod_inactive = '0'";
         }else{
-            $sqlText = "Select * From products where prod_inactive = '0' AND prod_name like '%{$name}%'";
+            $sqlText = "Select * From products_short where prod_inactive = '0' AND prod_name like '%{$name}%'";
         }
 
         $result = mysqli_query($this->con,$sqlText);

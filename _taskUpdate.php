@@ -348,7 +348,7 @@ include_once './lib/class.task.php';
                             $from_email=$Ob_manager->admin_email;
                             $from_id=$Ob_manager->admin_id;
 
-                          //  $is_send =  $Object->mail_to($from_name,$to_name,$email,$subject,$body);
+                            $is_send =  $Object->mail_to($from_name,$to_name,$email,$subject,$body);
 
                             /////////////////////////
                         }
