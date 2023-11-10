@@ -4,7 +4,7 @@ require_once 'db_connect.php';
 include_once 'jwtconfig.php';
 
 
-require_once 'PHPMailer-5.2.27/PHPMailerAutoload.php';
+//require_once 'PHPMailer-5.2.27/PHPMailerAutoload.php';
 
 include_once 'php-jwt/BeforeValidException.php';
 include_once 'php-jwt/ExpiredException.php';
@@ -5624,5 +5624,7 @@ opened,date_sent,content from `track_email` where id = '{$id}'";
 
         return $list;
     }
+
+
    //////////
 }  

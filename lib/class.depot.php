@@ -81,7 +81,7 @@ class Depot extends Common{
         $api_domain = $this->api_domain;
         $product_img = $this->product_img;
         $target_path_temp = $api_domain.$product_img;
-        //$target_path_temp ='http://localhost/CRMAPI/'.$product_img;
+       // $target_path_temp ='http://localhost/CRMAPI/'.$product_img;
         $result = mysqli_query($this->con,$query_short);
         $list = array();
         if($result){
@@ -807,6 +807,7 @@ class Depot extends Common{
                 }
             }else{
                 return array("Save_Update"=>false,"ERROR"=>"No data for create new container_type", "container_type_id"=>"");
+
             }
 
         }else{
@@ -837,12 +838,27 @@ class Depot extends Common{
 
     //-------------------------------
     public function new_update_rate_container($rate_container_id, $data){
+        $container_sku='';
+        $depot_id='';
+        $container_type_id='';
         if(empty($rate_container_id)){
             $fields = ""; $values="";
             foreach ($data as $k=>$v) {
                 if($k !='rate_container_id'){
                     if($k =='container_rate') {
                         if(!is_numeric($v)) $v =0;
+                    }
+                    if($k =='container_cost') {
+                        if(!is_numeric($v)) $v =0;
+                    }
+                    if($k =='container_sku') {
+                        $container_sku= $v;
+                    }
+                    if($k =='depot_id') {
+                        $depot_id= $v;
+                    }
+                    if($k =='container_type_id') {
+                        $container_type_id= $v;
                     }
 
                     $fields =($fields=="")? $k:$fields.",".$k;
@@ -857,6 +873,20 @@ class Depot extends Common{
                 $rate_container_id = mysqli_insert_id($this->con);
 
                 if(is_numeric($rate_container_id) && !empty($rate_container_id)){
+                    if($container_sku ==''){
+                        $state = $this->return_id("SELECT depot_state FROM depots
+                        WHERE depot_id  ='{$depot_id}'","depot_state");
+                        $container_type_name = $this->return_id("SELECT container_type_name FROM container_type
+                        WHERE container_type_id ='{$container_type_id}'","container_type_name");
+
+                        $sku = $container_type_name."_".$state."_".$rate_container_id;
+                        $sku = preg_replace("/\s+|`+|'+/", '', $sku);
+                        $table = 'rate_container';
+                        $array_primary =array('rate_container_id'=>$rate_container_id);
+                        $arr_key_value =array('container_sku'=>$sku);
+                        $this->update_table($table,$array_primary,$arr_key_value);
+                    }
+
                     return array("Save_Update"=>true,"ERROR"=>"","rate_container_id"=>$rate_container_id);
                 }else{
                     return array("Save_Update"=>false,"ERROR"=>mysqli_error($this->con),"rate_container_id"=>"");
@@ -872,7 +902,18 @@ class Depot extends Common{
                     if($k =='container_rate') {
                         if(! is_numeric($v)) $v =0;
                     }
-
+                    if($k =='container_cost') {
+                        if(!is_numeric($v)) $v =0;
+                    }
+                    if($k =='container_sku') {
+                        $container_sku= $v;
+                    }
+                    if($k =='depot_id') {
+                        $depot_id= $v;
+                    }
+                    if($k =='container_type_id') {
+                        $container_type_id= $v;
+                    }
                     $v_i = $this->protect($v);
                     $updateCommand = ($updateCommand=="")?$k."='{$v_i}'":$updateCommand.", ".$k."='{$v_i}'";
                 }
@@ -884,6 +925,19 @@ class Depot extends Common{
                 $update = mysqli_query($this->con,$query_update);
 
                 if($update){
+                    if($container_sku ==''){
+                        $state = $this->return_id("SELECT depot_state FROM depots
+                        WHERE depot_id  ='{$depot_id}'","depot_state");
+                        $container_type_name = $this->return_id("SELECT container_type_name FROM container_type
+                        WHERE container_type_id ='{$container_type_id}'","container_type_name");
+
+                        $sku = $container_type_name."_".$state."_".$rate_container_id;
+                        $sku = preg_replace("/\s+|`+|'+/", '', $sku);
+                        $table = 'rate_container';
+                        $array_primary =array('rate_container_id'=>$rate_container_id);
+                        $arr_key_value =array('container_sku'=>$sku);
+                        $this->update_table($table,$array_primary,$arr_key_value);
+                    }
                     return array("Save_Update"=>true,"ERROR"=>"");
                 }else{
                     return array("Save_Update"=>false,"ERROR"=>mysqli_error($this->con));
@@ -1225,7 +1279,7 @@ class Depot extends Common{
        // echo "<pre>";print_r($driver_min_rate);echo "</pre>"; die();
         return $total;
     }
-
+    //------------------------------------------------
     public function getQuoteTemp_qt_id($quote_temp_id)
     {
         $sqlText = "Select * From `quote_temp_short` where quote_temp_id ='{$quote_temp_id}' AND active=1";
@@ -1237,6 +1291,55 @@ class Depot extends Common{
             }
         }
         return $list;
+    }
+
+    //------------------------------------------------
+    public function check_rate_container_sku($container_sku,$rate_container_id) {
+        $container_sku = trim($container_sku);
+        if(!empty($product_id)){
+            $query = "SELECT count(*) FROM  rate_container WHERE container_sku = '{$container_sku}' AND rate_container_id <>'{$rate_container_id}' LIMIT 1";
+            if ($this->checkExists($query)){
+                return true;
+            }else{
+                return false;
+            }
+        }else{
+            $query = "SELECT count(*) FROM  rate_container WHERE container_sku = '{$container_sku}' LIMIT 1";
+            if ($this->checkExists($query)){
+                return true;
+            }else{
+                return false;
+            }
+        }
+    }
+
+    //------------------------------------------------
+    public function auto_update_sku()
+    {
+        $sqlText = "Select * From `rate_container_short` where container_sku = '' OR
+        container_sku IS NULL";
+        $result = mysqli_query($this->con,$sqlText);
+        $list = array();
+        if($result){
+            while ($row = mysqli_fetch_assoc($result)) {
+                $list[] = $row;
+            }
+        }
+
+        $table = 'rate_container';
+        $rtn = array();
+        if(count($list) > 0){
+            foreach($list as $item){
+                $sku = $item['container_type_name']."_".$item['depot_state']."_".$item['rate_container_id'];
+                $sku = preg_replace("/\s+|`+|'+/", '', $sku);
+                $array_primary =array('rate_container_id'=>$item['rate_container_id']);
+                $arr_key_value =array('container_sku'=>$sku);
+                $update = $this->update_table($table,$array_primary,$arr_key_value);
+                $rtn[] = array("rate_container_id"=>$item['rate_container_id'],"update"=>$update);
+            }
+        }
+
+        return $rtn;
     }
     //////////////////////////////////
  }

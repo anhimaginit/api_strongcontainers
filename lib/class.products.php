@@ -56,8 +56,7 @@ class Products extends Common{
     public function addProduct($product_notes,$product_tags,$product_taxable,$product_updated_by,$prod_class,
                                $prod_cost,$prod_desc,$prod_desc_short,$prod_height,$prod_inactive,
                                $prod_length,$prod_name,$prod_price,$prod_type,
-                               $prod_visible, $prod_weight,$prod_width,$SKU,$photoName,$prod_internal_visible,
-                               $depot_id,$container_type_id)
+                               $prod_visible, $prod_weight,$prod_width,$SKU,$photoName,$prod_internal_visible)
     {
 
         $fields = "product_notes,product_tags,product_taxable,product_updated_by,prod_class,
@@ -74,24 +73,18 @@ class Products extends Common{
                 '{$prod_length}','{$prod_name}','{$prod_price}','{$prod_type}',
                 '{$prod_visible}','{$prod_weight}','{$prod_width}','{$SKU}','{$dateTemp}','{$photoName}','{$prod_internal_visible}'";
 
-        if($depot_id !=''){
-            $fields .=",depot_id";
-            $values .=",'{$depot_id}'";
-        }
-        if($container_type_id !=''){
-            $fields .=",container_type_id";
-            $values .=",'{$container_type_id}'";
-        }
+
 
         $selectCommand ="SELECT COUNT(*) AS NUM FROM products WHERE `SKU` = '{$SKU}'";
         if ($this->checkExists($selectCommand)) return "The SKU doesn't already";
 
         $insertCommand = "INSERT INTO products({$fields}) VALUES({$values})";
-        //die($insertCommand);
+
         mysqli_query($this->con,$insertCommand);
         $idreturn = mysqli_insert_id($this->con);
+
         if(is_numeric($idreturn) && $idreturn !=''){
-            $idreturn = mysqli_insert_id($this->con);
+            return $idreturn;
         }else{
             return mysqli_error($this->con);
         }
@@ -101,8 +94,7 @@ class Products extends Common{
     public function updateProduct($id,$product_notes,$product_tags,$product_taxable,$product_updated_by,$prod_class,
                                   $prod_cost,$prod_desc,$prod_desc_short,$prod_height,$prod_inactive,
                                   $prod_length,$prod_name,$prod_price,$prod_type,
-                                  $prod_visible, $prod_weight,$prod_width,$SKU,$product_updated,$photoPath,$prod_internal_visible,
-                                  $depot_id,$container_type_id)
+                                  $prod_visible, $prod_weight,$prod_width,$SKU,$product_updated,$photoPath,$prod_internal_visible)
     {
 
         //$dateTemp = new DateTime($product_updated);
@@ -132,12 +124,6 @@ class Products extends Common{
                 prod_internal_visible ='{$prod_internal_visible}'";
         if(!empty($photoPath)){
             $updateCommand .=",prod_photo = '{$photoPath}'";
-        }
-        if($depot_id !=''){
-            $updateCommand .=",depot_id = '{$depot_id}'";
-        }
-        if($container_type_id !=''){
-            $updateCommand .=",container_type_id = '{$container_type_id}'";
         }
 
         $updateCommand .=" WHERE ID = '{$id}'";
@@ -603,6 +589,22 @@ class Products extends Common{
         }
         return $list;
     }
+
+    //------------------------------------------------
+    public function get_valid_sku() {
+        $query = "SELECT `container_sku`  FROM  `rate_container` WHERE
+        container_sku NOT IN (SELECT `SKU` FROM `products`)";
+        $result = mysqli_query($this->con,$query);
+
+        $list = array();
+        if($result){
+            while ($row = mysqli_fetch_assoc($result)) {
+                $list[] = $row;
+            }
+        }
+        return $list;
+    }
+
 
     /////////////////////////////////////////////////////////
 }
