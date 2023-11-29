@@ -4,10 +4,9 @@ header('Access-Control-Allow-Origin: '.$origin);
 header('Access-Control-Allow-Methods: POST, OPTIONS, GET, PUT');
 header('Access-Control-Allow-Credentials: true');
 
-include_once './lib/class.depot.php';
-    $Object = new Depot();
-
-    $EXPECTED = array('token','depot_id');
+include_once './lib/class.report.order.php';
+    $Object = new ReportOrder();
+    $EXPECTED = array('token','status','from_date','to_date','text_search','cursor','limit');
 
     foreach ($EXPECTED AS $key) {
         if (!empty($_POST[$key])){
@@ -17,19 +16,12 @@ include_once './lib/class.depot.php';
         }
     }
 
-    //--- validate
-$isAuth =$Object->basicAuth($token);
-if(!$isAuth){
-    $ret = array('ERROR'=>'Authentication is failed');
-}else{
-    $ret = $Object->get_depot_id($depot_id);
-
-    $api_domain = $Object->api_domain;
-    $product_img = $Object->product_img;
-    $target_path_image = $api_domain.$product_img;
-    $ret['ERROR'] = "";
-    $ret['path_image'] =$target_path_image;
-}
+    $isAuth =$Object->basicAuth($token);
+    if(!$isAuth){
+        $ret = array('ERROR'=>'Authentication is failed','list'=>array());
+    }else{
+        $ret = $Object->get_order_report_salesperson_paid($from_date,$to_date,$text_search,$cursor,$limit);
+    }
     $Object->close_conn();
     echo json_encode($ret);
 

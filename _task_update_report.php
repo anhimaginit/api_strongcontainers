@@ -28,17 +28,38 @@ include_once './lib/class.task.php';
                 $data = $_POST["data_post"];
                 if(is_array($data)){
                     foreach($data as $item){
-                        $id = $Object->protect($item["id"]);
-                        if($id !='' && is_numeric($id)){
+                        $order_id = $Object->protect($item["order_id"]);
+                        if($order_id !='' && is_numeric($order_id)){
+                            $id = $Object->protect($item["id"]);
                             $status_exsiting = $Object->return_id("select status from assign_task where id = '{$id}'",'status');
+                            //echo "<pre>";print_r($order_id);echo "</pre>";
+                            if($status_exsiting !='CLOSED' && $status_exsiting !='CANCELLED'){
+                                if($status_exsiting !='DELIVERED'){
+                                   // echo "<pre>";print_r("st = ".$status_exsiting);echo "</pre>"; die();
+                                    $status = $Object->protect($item["status"]);
+                                    if($id !='' && $id !=null){
+                                        $p_key = array("id"=>$id);
+                                        $k_value= array("status"=>$status);
+                                        $list[] = $Object->update_table("assign_task",$p_key,$k_value);
+                                    }
 
-                            if($status_exsiting !='close' && $status_exsiting !="CONTAINER DELIVERED"){
-                                $status = $Object->protect($item["status"]);
-                                $p_key = array("id"=>$id);
-                                $k_value= array("status"=>$status);
-                                //echo "<pre>";print_r($p_key);echo "</pre>";
-                                //echo "<pre>";print_r($k_value);echo "</pre>"; die();
-                                $list[] = $Object->update_table("assign_task",$p_key,$k_value);
+                                    $p_key = array("order_id "=>$order_id);
+                                    $k_value= array("order_status"=>$status);
+                                    $Object->update_table("quote",$p_key,$k_value);
+                                }else{
+                                    if($status=='CLOSED'){
+                                        $status = $Object->protect($item["status"]);
+                                        if($id !='' && $id !=null){
+                                            $p_key = array("id"=>$id);
+                                            $k_value= array("status"=>$status);
+                                            $list[] = $Object->update_table("assign_task",$p_key,$k_value);
+                                        }
+                                        $p_key = array("order_id "=>$order_id);
+                                        $k_value= array("order_status"=>$status);
+                                        $Object->update_table("quote",$p_key,$k_value);
+                                    }
+                                }
+
                             }
                         }
                     }

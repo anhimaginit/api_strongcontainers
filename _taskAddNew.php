@@ -29,7 +29,8 @@ include_once './lib/class.task.php';
             $errObj = $Object->validate_task_fields($taskName);
             if(!$errObj['error']){
                 if($deliverydate !=''){
-                    if($status !="CLOSED" && $status != ! 'PICKED UP' && $status != ! 'DELIVERED') $status ="SCHEDULED FOR DELIVERY";
+                    if($status !="CLOSED" && $status !='PICKED UP' &&
+                        $status !='DELIVERED' && $status !='CANCELLED') $status ="SCHEDULED FOR DELIVERY";
                 }
                 //process image
                 $api_domain = $Object->api_domain;
@@ -88,7 +89,7 @@ include_once './lib/class.task.php';
                 }
 
                 if($list_file_upload_name !=''){
-                    if($status !="CLOSED") $status ="PICKED UP";
+                    if($status !="CLOSED" && $status !='CANCELLED') $status ="PICKED UP";
                     $upload_existing_file= ($upload_existing_file=='')?$list_file_upload_name : $upload_existing_file.','.$list_file_upload_name ;
 
                 }
@@ -147,7 +148,7 @@ include_once './lib/class.task.php';
                 }
 
                 if($list_file_unload_name !=''){
-                    if($status !="CLOSED") $status ="DELIVERED";
+                    if($status !="CLOSED" && $status !='CANCELLED') $status ="DELIVERED";
                     $unload_existing_file= ($unload_existing_file=='')?$list_file_unload_name : $unload_existing_file.','.$list_file_unload_name ;
                 }
                 //use to database
@@ -164,10 +165,11 @@ include_once './lib/class.task.php';
                     $doneDate,$dueDate,$status,$taskName,$time,$alert,$urgent,
                 $assign_order,$assign_driver_id,$deliverydate,$product_sku,
                     $file_upload_name,$file_unload_name);
+
                 if(is_numeric($result) && $result!=""){
                     //update sku field in order
                     if($assign_order !=''){
-                        $order_sku_existing = $Object->return_id("SELECT order_sku FROM `quote` WHERE order_id = '{$assign_order}'","order_sku");
+                      /*  $order_sku_existing = $Object->return_id("SELECT order_sku FROM `quote` WHERE order_id = '{$assign_order}'","order_sku");
                         $order_sku_existing = json_decode($order_sku_existing,true);
                         $order_sku_processed = array();
                         foreach($order_sku_existing as $itm){
@@ -175,7 +177,7 @@ include_once './lib/class.task.php';
                             $arr_temp =array();
                             if($itm["sku"] == $product_sku){
                                 $arr_temp["quantity"] = 0;
-                                if($itm["quantity"] > 0 ); $arr_temp["quantity"] = $itm["quantity"] -1;
+                                if($itm["quantity"] > 0 ); $arr_temp["quantity"] = 0; //$itm["quantity"] -1;
                                 $arr_temp["sku"]  = $itm["sku"];
                                 array_push($order_sku_processed,$arr_temp);
                             }else{
@@ -194,7 +196,10 @@ include_once './lib/class.task.php';
                         $order_sku_processed =json_encode($order_sku_processed) ;
                         $array_key_value = array("sku_list"=>$sku_list,
                             "available_container_amount"=>$container_amount,
-                        "order_sku"=>$order_sku_processed);
+                        "order_sku"=>$order_sku_processed,
+                        "order_status"=>$status);*/
+                        $array_key_value = array(
+                            "order_status"=>$status);
                         $array_primary =array("order_id"=>$assign_order);
 
                         $Object->update_table("quote",$array_primary,$array_key_value);
@@ -203,9 +208,9 @@ include_once './lib/class.task.php';
                     if($assign_order !='' && $assign_driver_id !=''){
                         $deliverydate = $Object->is_Date1($deliverydate);
                         $available_container = $Object->return_id("SELECT available_container_amount FROM `quote` WHERE order_id = '{$assign_order}'","available_container_amount");
-                        if(($available_container ==0 || $available_container =="") && $deliverydate !=''){
+                       /* if(($available_container ==0 || $available_container =="") && $deliverydate !=''){
                             $Object->Order_update_one_field($assign_order,"order_status" ,"Scheduled for delivery");
-                        }
+                        }*/
                         //send email to driver
                         $order_total = $Object->return_id("SELECT `total` FROM `quote` WHERE order_id  = '{$assign_order}'","total");
                         $driver_total = $Object->return_id("SELECT `driver_total` FROM `assign_task` WHERE id  = '{$result}'","driver_total");
@@ -219,7 +224,15 @@ include_once './lib/class.task.php';
                         <tr><td>Phone number: '.$depot_customer["depot_phone"].'</td></tr>
                         <tr> <td>Address: '.$depot_customer["depot_address"].'</td></tr>
                         <tr> <td>Depot to Customer: '.$depot_customer["distance"].' miles</td></tr>
-                        <tr> <td>Order total:$ '.number_format($order_total,2,".",",").'</td></tr>
+                        <tr><td></td></tr>
+                        <tr> <td></td></tr>
+                        <tr> <td></td></tr>';
+
+                        $container_info ='
+                        <tr><td><strong>CONTAINER INFO</strong></td> </tr>
+                        <tr><td>Name: '.$depot_customer["prod_name"].'</td></tr>
+                        <tr><td>SKU: '.$depot_customer["prod_SKU"].'</td></tr>
+                        <tr> <td>Quantity: '.$depot_customer["qty"].'</td></tr>
                         <tr><td></td></tr>
                         <tr> <td></td></tr>
                         <tr> <td></td></tr>';
@@ -254,6 +267,7 @@ include_once './lib/class.task.php';
                       <body>
                             <table>
                                 '.$depot_info.'
+                                '.$container_info.'
                                 '.$driver_tr.'
                                 '.$customer_info.'
                             </table>
@@ -283,18 +297,20 @@ include_once './lib/class.task.php';
                         'files_save_err'=>$files_save_err,
                         'fileError'=>$fileError,
                         'file_pickup'=>$file_name_upload_return,
-                        'sent_email'=>$is_send);
+                        'sent_email'=>$is_send,
+                        'assign_order'=>$assign_order);
                 }else{
-                    $ret = array('SAVE'=>'FAIL','ERROR'=>$result,'AUTH'=>true,'id'=>'');
+                    $ret = array('SAVE'=>'FAIL','ERROR'=>$result,'AUTH'=>true,'id'=>'',
+                        'assign_order'=>'');
                 }
 
             }else{
-                $ret = array('SAVE'=>'FAIL','ERROR'=>$errObj['errorMsg'],'AUTH'=>true);
-
+                $ret = array('SAVE'=>'FAIL','ERROR'=>$errObj['errorMsg'],'AUTH'=>true,
+                    'assign_order'=>'');
             }
 
         }else{
-            $ret = array('AUTH'=>false,'ERROR'=>$isAuth['ERROR']);
+            $ret = array('AUTH'=>false,'ERROR'=>$isAuth['ERROR'],'assign_order'=>'');
         }
 
     }

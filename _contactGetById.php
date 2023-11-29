@@ -24,8 +24,8 @@ include_once './lib/class.contact.php';
     }else{
         $ret = $Object->getContact_ID($ID);
         $api_domain = $Object->api_domain;
-        //$driver_avatar_path = $api_domain.$Object->driver_avatar;
-        $driver_avatar_path ='C:/xampp/htdocs/CRMAPI/'.$Object->driver_avatar;
+        $driver_avatar_path = $api_domain.$Object->driver_avatar;
+        //$driver_avatar_path ='C:/xampp/htdocs/CRMAPI/'.$Object->driver_avatar;
         //$target_path = $driver_avatar_path.$f_name;
         if($ret[0]["driver_avatar"] !='' && $ret[0]["driver_avatar"] !=null){
             $ret[0]["driver_avatar"] = $driver_avatar_path.$ret[0]["driver_avatar"];

@@ -9,7 +9,8 @@ include_once '_qbviacurl.php';
 $Object = new Orders();
     $EXPECTED = array('token','order_id','balance','bill_to','note','payment',
         'ship_to','salesperson','total','order_total','warranty','order_title','discount_code',
-        'jwt','private_key','contract_overage','grand_total','quickbooks_call');
+        'jwt','private_key','contract_overage','grand_total','quickbooks_call',
+    'order_releases');
 
     foreach ($EXPECTED AS $key) {
         if (!empty($_POST[$key])){
@@ -26,12 +27,48 @@ $Object = new Orders();
     if(isset($_POST['order_doors'])) $data_post['order_doors'] = $Object->protect($_POST['order_doors']);
     if(isset($_POST['order_releases'])) $data_post['order_releases'] = $Object->protect($_POST['order_releases']);
     if(isset($_POST['note'])) $data_post['note'] = $Object->protect($_POST['note']);
-    if(isset($_POST['discount_code'])) $data_post['discount_code'] = $Object->protect($_POST['discount_code']);
+    if(isset($_POST['order_status'])){
+        if($_POST['order_status'] !=''){
+            $data_post['order_status'] = $Object->protect($_POST['order_status']);
+        }
+    };
+    $cancelled = $Object->return_id("SELECT order_status FROM quote WHERE order_id ='{$order_id}'","order_status");
+
+    if($cancelled =='CANCELLED' || $cancelled =='CLOSED'){
+        $ret = array('SAVE'=>'FAIL','ERROR'=>'Can not update order');
+        $Object->close_conn();
+        echo json_encode($ret);
+        return;
+    }elseif($cancelled =='SCHEDULED FOR DELIVERY' || $cancelled =='PICKED UP' ||
+        $cancelled =='DELIVERED'){
+        $table ='quote';
+        $array_primary = array("order_id"=>$order_id);
+        $arr_key_value = array();
+        if($salesperson !=''){
+            $arr_key_value["salesperson"]=$salesperson;
+        }
+        if($order_releases !=''){
+            $arr_key_value["order_releases"]=$order_releases;
+        }
+        if(count($arr_key_value) >0){
+           $rsl =$Object->update_table($table,$array_primary,$arr_key_value);
+            //print_r($rsl); die();
+            if($rsl ==1){
+                $ret = array('AUTH'=>true,'SAVE'=>'SUCCESS','ERROR'=>'');
+            }else{
+                $ret = array('AUTH'=>true,'SAVE'=>'FAIL','ERROR'=>$rsl);
+            }
+            $Object->close_conn();
+            echo json_encode($ret);
+            return;
+        }
+
+    }
     //--- validate
     $isAuth =$Object->basicAuth($token);
     if(!$isAuth){
-        $ret = array('SAVE'=>false,'ERROR'=>'Authentication is failed');
-    }else if(!empty($order_id)){
+        $ret = array('SAVE'=>'FAIL','ERROR'=>'Authentication is failed');
+    }else if(!empty($order_id) && $cancelled !='CANCELLED'){
         $isAuth = $Object->auth($jwt,$private_key);
 
         if($isAuth['AUTH']){
@@ -88,9 +125,9 @@ $Object = new Orders();
                 //check assign task
                 $assign_order = $Object->return_id("SELECT assign_order FROM assign_task WHERE assign_order='{$order_id}'","assign_order");
                 if($assign_order !=''){
-                    $ret = array('AUTH'=>true,'SAVE'=>'FAIL','ERROR'=>"Oder can't change");
-                    echo json_encode($ret);
-                    return;
+                   // $ret = array('AUTH'=>true,'SAVE'=>'FAIL','ERROR'=>"Oder can't change");
+                   // echo json_encode($ret);
+                   // return;
                 }
                 if($payment >0 && $balance!=0){
                     $old =$Object->getSub_OrderID($order_id);

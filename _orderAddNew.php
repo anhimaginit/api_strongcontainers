@@ -10,7 +10,7 @@ include_once '_qbviacurl.php';
 
     $EXPECTED = array('token','balance','bill_to','note','payment','salesperson','total','warranty','order_title','jwt',
         'private_key','order_total','discount_code','order_create_by','contract_overage','grand_total',
-        'order_doors','order_releases');
+        'order_doors','order_releases','order_zipcode');
 
     foreach ($EXPECTED AS $key) {
         if (!empty($_POST[$key])){
@@ -49,6 +49,7 @@ include_once '_qbviacurl.php';
         if($isAuth['AUTH']){
             $errObj = $Object->validate_order_fields($token,$bill_to,$salesperson);
             if(!$errObj['error']){
+
                 $value_Array = $_POST['products_ordered'];
                 //echo "<pre>";print_r($value_Array);echo "</pre>"; die();
                 $container = array();
@@ -121,7 +122,7 @@ include_once '_qbviacurl.php';
                             $salesperson,$total,$warranty,$notes,$order_title,$subscription,
                             $discount_code,$order_create_by,$contract_overage,$grand_total,
                             $rsl['quote_temp_id'],$container,
-                            $order_doors,$order_releases);
+                            $order_doors,$order_releases,$order_zipcode);
                     }else{
                         $result ="Error";
                     }
@@ -206,6 +207,90 @@ include_once '_qbviacurl.php';
                     */
                    // $ret = array('AUTH'=>true,'SAVE'=>'SUCCESS','ERROR'=>'','ID'=>$result,'invID'=>$invID,'rsl_emp'=>$rsl_customer,'qbInvoiceID'=>$qbInfo_decode['CreatedId']);
                     //
+
+                    //send email
+                    $code = $Object->return_id("SELECT code FROM quote_short where order_id ='{$result}'","code");
+                    $temp =$Object->get_quote_temp($code);
+                    $quote=$temp['quotes'];
+                    $more_info = $temp["more_info"];
+                    $status ='';
+                    $email = $more_info['email_phone'];
+                    if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+                        $status = 'Bounce';
+                    }
+                    //check email
+                    $domain = substr($email, strpos($email, '@') + 1);
+                    if  (!checkdnsrr($domain) !== FALSE) {
+                        $status = 'Bounce';
+                    }
+                    if(empty($status)){
+                        //get admin info
+                        $Ob_manager = new EmailAdress();
+                        $domain_path = $Ob_manager->domain_path;
+                        $from_name=$Ob_manager->admin_name ;
+                        $from_email=$Ob_manager->admin_email;
+                        $from_id=$Ob_manager->admin_id;
+
+                        $tr='';
+                        foreach($quote as $item){
+                            $tr .='<tr>
+                        <td>'.$item["prod_name"].'</td>
+                        <td>'.$item["qty"].'</td>
+                        <td style="text-align: right">$'.number_format($total,2,".",",").'</td>
+                        </tr>';
+                        }
+
+                        $div ='';
+                        $div .='<div style="text-align: center; width: 100%"><strong>Customer info</strong></div>';
+                        $div .='<div style="width: 100%">Customer name: '.$more_info["shipping_customer_name"].'</div>';
+                        $div .='<div style="width: 100%">Customer address: '.$more_info["shipping_address"].'</div>';
+                        $div .='<div style="width: 100%">Customer Phone: '.$more_info["shipping_phone"].'</div>';
+
+                        $div .='<div style="width: 100%"><strong>Order</strong></div>';
+                        $div .='<div style="width: 100%">Order title: '.$more_info["order_title"].'</div>';
+                        $div .='<div style="width: 100%">Order status: '.$more_info["order_status"].'</div>';
+
+                        $table =' <table style="width:100%;">
+                        <thead>
+                            <tr>
+                                <th style="width: 50%;">Container name</th>
+                                <th style="width: 20%;">Quality</th>
+                                <th style="width: 30%;">Total line</th>
+                            </tr>
+                        </thead>
+                        <tbody>'.$tr.'
+                        <tr style="text-align: right">
+                        <td colspan="2" class="p-r20" style="text-align: right"><strong>Total</strong></td>
+                        <td style="text-align: right">$'.number_format($total,2,".",",").'</td>
+                        </tr>
+                        </tbody>
+                    </table>';
+
+                        $html='<html lang="en">
+                      <head>
+                        <meta charset="UTF-8">
+                        <link rel="stylesheet" href="http://phptopdf.com/bootstrap.css">
+
+                      </head>
+                      <body>
+                        '.$div.'
+                        <div class="m_t10" style="width: 100%">'.$table.'</div>
+                      </body>
+                    </html>';
+
+                        $hrf =$domain_path."/confirm_quote.php?id=".$code;
+                        $url='<a href='.$hrf.' > Click here to confirm your quote</a>';
+
+                        $subject ="Your Quote";
+                        $to_name = $more_info["shipping_customer_name"];
+                        $body ='<p>Hi</p>
+                        <p>'.$url.'</p>';
+                        $is_send =0;
+                        //print_r($html); die();
+                        //$is_send =  $Object->mail_to($from_name,$to_name,$email,$subject,$body,'',$file_temp,$file_name);
+                        $ret["email_sent"] =$is_send;
+                    }
+
                     $ret = array('AUTH'=>true,'SAVE'=>'SUCCESS','ERROR'=>'','ID'=>$result,'invID'=>$invID);
 
                 } else {
@@ -214,12 +299,13 @@ include_once '_qbviacurl.php';
                         ",  salesperson ".$salesperson.", err: ".$result;
 
                     $Object->err_log("Orders",$info,0);
+                    $ret = array('AUTH'=>true,'SAVE'=>'FAIL','ERROR'=>$result);
 
-                    if($result){
+                   /* if($result){
                         $ret = array('AUTH'=>true,'SAVE'=>'FAIL','ERROR'=>$result);
                     }else{
                         $ret = array('AUTH'=>true,'SAVE'=>'FAIL','ERROR'=>'System can not add the order.');
-                    }
+                    }*/
 
                 }
             }else{

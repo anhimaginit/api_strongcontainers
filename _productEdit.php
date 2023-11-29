@@ -16,7 +16,6 @@ include_once '_qbviacurl.php';
         'prod_height','prod_inactive','prod_length','prod_name','prod_price',
         'prod_type','prod_visible','prod_weight','prod_width',
         'SKU','product_updated','prod_file_name','prod_internal_visible',
-        'depot_id','container_type_id',
         'jwt','private_key');
 
     foreach ($EXPECTED AS $key) {
@@ -148,8 +147,7 @@ include_once '_qbviacurl.php';
                     $result = $Object->updateProduct($ID,$product_notes,$product_tags,$product_taxable,$product_updated_by,$prod_class,
                         $prod_cost,$prod_desc,$prod_desc_short,$prod_height,$prod_inactive,
                         $prod_length,$prod_name,$prod_price,$prod_type,
-                        $prod_visible, $prod_weight,$prod_width,$SKU,$product_updated,$photoPath,$prod_internal_visible,
-                        $depot_id,$container_type_id);
+                        $prod_visible, $prod_weight,$prod_width,$SKU,$product_updated,$photoPath,$prod_internal_visible);
 
                     //die($ID);
                     if($result && is_numeric($result)){

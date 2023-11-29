@@ -26,11 +26,12 @@ include_once './lib/class.task.php';
         //$isAuth['AUTH']=true;
         if($isAuth['AUTH']){
             $status_exsiting = $Object->return_id("select status from assign_task where id = '{$id}'",'status');
-            if($status_exsiting !='CLOSED'){
+            if($status_exsiting !='CLOSED' && $status_exsiting !='CANCELLED'){
                 $errObj = $Object->validate_task_fields($taskName);
                 if(!$errObj['error']){
                     if($deliverydate !=''){
-                        if($status !="CLOSED" && $status != ! 'PICKED UP' && $status != ! 'DELIVERED') $status ="SCHEDULED FOR DELIVERY";
+                        if($status !="CLOSED" && $status !='PICKED UP' &&
+                            $status != 'DELIVERED' && $status !='CANCELLED') $status ="SCHEDULED FOR DELIVERY";
                     }
                     //process image
                     $api_domain = $Object->api_domain;
@@ -89,7 +90,7 @@ include_once './lib/class.task.php';
                     }
 
                     if($list_file_upload_name !=''){
-                        if($status !="CLOSED" && $status !="DELIVERED") $status ="PICKED UP";
+                        if($status !="CLOSED" && $status !="DELIVERED" && $status !='CANCELLED') $status ="PICKED UP";
                         $upload_existing_file= ($upload_existing_file=='')?$list_file_upload_name : $upload_existing_file.','.$list_file_upload_name ;
 
                     }
@@ -164,7 +165,7 @@ include_once './lib/class.task.php';
                     }
 
                     if($list_file_unload_name !=''){
-                        if($status !="CLOSED") $status ="DELIVERED";
+                        if($status !="CLOSED" && $status !='CANCELLED') $status ="DELIVERED";
                         $unload_existing_file= ($unload_existing_file=='')?$list_file_unload_name : $unload_existing_file.','.$list_file_unload_name ;
                     }
                     //use to database
@@ -207,85 +208,19 @@ include_once './lib/class.task.php';
                     if(is_numeric($result) && $result!=""){
                         //update sku
                         if($assign_order !=''){
-                            if(trim($sku_existing_task) !=trim($product_sku)){
-                                //restore sku for old order
-                                $order_sku_existing = $Object->return_id("SELECT order_sku FROM `quote` WHERE order_id = '{$order_existing_task}'","order_sku");
-                                $order_sku_existing = json_decode($order_sku_existing,true);
-                                $order_sku_processed = array();
-                                foreach($order_sku_existing as $itm){
-                                    $arr_temp =array();
-                                    if($itm["sku"] == $sku_existing_task){
-                                        $arr_temp["quantity"] = 0;
-                                        $arr_temp["quantity"] = $itm["quantity"] +1;
-                                        $arr_temp["sku"]  = $itm["sku"];
-                                        array_push($order_sku_processed,$arr_temp);
-                                    }else{
-                                        array_push($order_sku_processed,$itm);
-                                    }
-                                }
-
-                                $sku_list =''; $container_amount =0;
-                                foreach($order_sku_processed as $itm){
-                                    if($itm["quantity"] > 0){
-                                        $sku_list = ($sku_list =="")? trim($itm["sku"]): $sku_list.",".trim($itm["sku"]);
-                                        $container_amount +=$itm["quantity"] ;
-                                    }
-                                }
-
-                                $order_sku_processed =json_encode($order_sku_processed) ;
-                                $array_key_value = array("sku_list"=>$sku_list,
-                                    "available_container_amount"=>$container_amount,
-                                    "order_sku"=>$order_sku_processed);
-                                $array_primary =array("order_id"=>$order_existing_task);
-
-                                $Object->update_table("quote",$array_primary,$array_key_value);
-                                //update sku
-                                $order_sku = $Object->return_id("SELECT order_sku FROM `quote` WHERE order_id = '{$assign_order}'","order_sku");
-                                $order_sku = json_decode($order_sku,true);
-                                $order_sku_processed = array();
-                                foreach($order_sku as $itm){
-                                    $arr_temp =array();
-                                    if($itm["sku"] == $product_sku){
-                                        $arr_temp["quantity"] = 0;
-                                        if($itm["quantity"] > 0 ); $arr_temp["quantity"] = $itm["quantity"] -1;
-                                        $arr_temp["sku"]  = $itm["sku"];
-                                        array_push($order_sku_processed,$arr_temp);
-                                    }else{
-                                        array_push($order_sku_processed,$itm);
-                                    }
-                                }
-
-                                $sku_list =''; $container_amount =0;
-                                foreach($order_sku_processed as $itm){
-                                    if($itm["quantity"] > 0){
-                                        $sku_list = ($sku_list =="")? trim($itm["sku"]): $sku_list.",".trim($itm["sku"]);
-                                        $container_amount +=$itm["quantity"] ;
-                                    }
-                                }
-
-                                $order_sku_processed =json_encode($order_sku_processed) ;
-                                $array_key_value = array("sku_list"=>$sku_list,
-                                    "available_container_amount"=>$container_amount,
-                                    "order_sku"=>$order_sku_processed);
-                                $array_primary =array("order_id"=>$order_existing_task);
-
-                                $Object->update_table("quote",$array_primary,$array_key_value);
-                                ///////
-                            }
+                            $array_key_value = array(
+                                "order_status"=>$status);
+                            $array_primary =array("order_id"=>$order_existing_task);
+                            $Object->update_table("quote",$array_primary,$array_key_value);
                         }
                         $is_send =0;
                         if($assign_order !='' && $assign_driver_id !=''){
                             $deliverydate = $Object->is_Date1($deliverydate);
                             if($deliverydate !=''){
                                 $available_container = $Object->return_id("SELECT available_container_amount FROM `quote` WHERE order_id = '{$assign_order}'","available_container_amount");
-                                if($available_container ==0 || $available_container ==""){
-                                    $Object->Order_update_one_field($assign_order,"order_status" ,"Scheduled for delivery");
-                                }
                             }
                             //send email to driver
                             $driver_info = $Object->getContactEmail_ID($assign_driver_id);
-                            //$info = $Object->depot_and_customer_address($assign_order);
-                            //$customer = $Object->customer_info_order($assign_order);
                             $depot_customer = $Object->depot_customer_by_sku($product_sku);
 
                             $order_total = $Object->return_id("SELECT `total` FROM `quote` WHERE order_id  = '{$assign_order}'","total");
@@ -297,7 +232,15 @@ include_once './lib/class.task.php';
                         <tr><td>Phone number: '.$depot_customer["depot_phone"].'</td></tr>
                         <tr> <td>Address: '.$depot_customer["depot_address"].'</td></tr>
                         <tr> <td>Depot to Customer: '.$depot_customer["distance"].' mile</td></tr>
-                        <tr> <td>Order total:$ '.number_format($order_total,2,".",",").'</td></tr>
+                        <tr><td></td></tr>
+                        <tr> <td></td></tr>
+                        <tr> <td></td></tr>';
+
+                            $container_info ='
+                        <tr><td><strong>CONTAINER INFO</strong></td> </tr>
+                        <tr><td>Name: '.$depot_customer["prod_name"].'</td></tr>
+                        <tr><td>SKU: '.$depot_customer["prod_SKU"].'</td></tr>
+                        <tr> <td>Quantity: '.$depot_customer["qty"].'</td></tr>
                         <tr><td></td></tr>
                         <tr> <td></td></tr>
                         <tr> <td></td></tr>';
@@ -332,6 +275,7 @@ include_once './lib/class.task.php';
                       <body>
                             <table>
                                 '.$depot_info.'
+                                '.$container_info.'
                                 '.$driver_tr.'
                                 '.$customer_info.'
                             </table>
@@ -348,10 +292,12 @@ include_once './lib/class.task.php';
                             $from_email=$Ob_manager->admin_email;
                             $from_id=$Ob_manager->admin_id;
 
-                            $is_send =  $Object->mail_to($from_name,$to_name,$email,$subject,$body);
+                           $is_send =  $Object->mail_to($from_name,$to_name,$email,$subject,$body);
 
                             /////////////////////////
                         }
+                        $driver_total = $Object->return_id("SELECT driver_total FROM assign_task
+                        WHERE id='{$id}'","driver_total");
                         $ret = array('SAVE'=>'SUCCESS','ERROR'=>'','AUTH'=>true,'id'=>$id,
                             'files_save_unload_err'=>$files_save_unload_err,
                             'fileUnloadError'=>$fileUnloadError,
@@ -359,12 +305,16 @@ include_once './lib/class.task.php';
                             'files_save_err'=>$files_save_err,
                             'fileError'=>$fileError,
                             'file_pickup'=>$file_name_upload_return,
-                            'sent_email'=>$is_send);
+                            'sent_email'=>$is_send,
+                            'assign_order'=>$assign_order,
+                            'driver_total'=>$driver_total);
                     }else{
-                        $ret = array('SAVE'=>'FAIL','ERROR'=>$result,'AUTH'=>true,'id'=>$id);
+                        $ret = array('SAVE'=>'FAIL','ERROR'=>$result,'AUTH'=>true,'id'=>$id,
+                            'assign_order'=>'');
                     }
                 }else{
-                    $ret = array('SAVE'=>'FAIL','ERROR'=>$errObj['errorMsg'],'AUTH'=>true);
+                    $ret = array('SAVE'=>'FAIL','ERROR'=>$errObj['errorMsg'],'AUTH'=>true,
+                        'assign_order'=>'');
                 }
 
             }else{

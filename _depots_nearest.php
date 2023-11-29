@@ -7,7 +7,8 @@ header('Access-Control-Allow-Credentials: true');
 include_once './lib/class.depot.php';
     $Object = new Depot();
 
-    $EXPECTED = array('token','zip','container_type_id');
+    $EXPECTED = array('token','zip','container_type_id','container_feet_type',
+    'find_depot');
 
     foreach ($EXPECTED AS $key) {
         if (!empty($_POST[$key])){
@@ -22,7 +23,7 @@ $isAuth = true;//$Object->basicAuth($token);
 if(!$isAuth){
     $ret = array('ERROR'=>'Authentication is failed');
 }else{
-    $ret = $Object->depots_short($zip,$container_type_id);
+    $ret = $Object->depots_short($zip,$container_type_id,$container_feet_type,$find_depot);
 }
     $Object->close_conn();
     echo json_encode($ret);

@@ -7,7 +7,7 @@ header('Access-Control-Allow-Credentials: true');
 include_once './lib/class.depot.php';
     $Object = new Depot();
 
-    $EXPECTED = array('token','limit','cursor','text_search');
+    $EXPECTED = array('token','limit','cursor','text_search','depot_id');
 
     foreach ($EXPECTED AS $key) {
         if (!empty($_POST[$key])){
@@ -22,7 +22,7 @@ $isAuth =$Object->basicAuth($token);
 if(!$isAuth){
     $ret = array('ERROR'=>'Authentication is failed');
 }else{
-    $ret = $Object->search_rate_container($limit,$cursor,$text_search);
+    $ret = $Object->search_rate_container($limit,$cursor,$text_search,$depot_id);
     $ret['ERROR'] = "";
 }
     $Object->close_conn();

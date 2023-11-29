@@ -9,7 +9,8 @@ include_once './lib/class.payment.php';
 
     $EXPECTED = array('token','pay_driver','pay_amount',
         'pay_task','pay_date','submit_by','pay_type',
-    'pay_note');
+    'pay_note','is_pay_to',
+    'pay_to','pay_form','transaction');
 
     foreach ($EXPECTED AS $key) {
         if (!empty($_POST[$key])){
@@ -28,9 +29,13 @@ include_once './lib/class.payment.php';
 
         if(!$errObj['error']){
             //check credit
-            $return = $Object->new_pay_driver($pay_driver,$pay_amount,$pay_task,$pay_date,
-                   $submit_by,$pay_type,$pay_note);
-
+            if($is_pay_to == 1){
+                $return = $Object->new_pay_salesperson($pay_to,$pay_amount,$pay_form,$pay_date,
+                    $submit_by,$pay_type,$pay_note,$transaction);
+            }else{
+                $return = $Object->new_pay_driver($pay_driver,$pay_amount,$pay_task,$pay_date,
+                    $submit_by,$pay_type,$pay_note);
+            }
         }else{
             $return = array('AUTH'=>true,'SAVE'=>'FAIL','ERROR'=>$errObj['errorMsg'],'pay_id'=>'');
         }
