@@ -1,0 +1,513 @@
+	---------------------------quote_short new--------------------------	
+
+DROP VIEW quote_short;
+	
+CREATE VIEW quote_short AS 
+SELECT   `o`.`discount_code`,o.order_id, o.products_ordered, o.balance, 
+o.bill_to, o.createTime,
+         o.note, o.payment, o.salesperson,o.warranty,o.order_title,
+         o.	total, c.company_name as b_company_name,
+		 o.subscription,
+		 o.order_create_by,
+		 o.contract_overage,o.grand_total,		 
+		 o.order_status,
+		 o.available_container_amount,
+		 o.sku_list,
+		 o.order_sku,
+		 o.quote_temp_id,
+		 o.order_releases,
+		 o.order_doors,
+		 o.order_zipcode,
+		 o.salesperson_amount,
+		 concat(IFNULL(c.first_name,''),IFNULL(c.middle_name,''),' ',IFNULL(c.last_name,'')) as b_name,
+         c.first_name as b_first_name, 
+		 c.last_name as b_last_name, 
+		 c.ID as b_ID, 
+		 c.primary_city as b_primary_city, c.primary_email as b_primary_email,
+         c.primary_phone as b_primary_phone,c.primary_state as b_primary_state,
+		 c.primary_street_address1 as b_address1, 
+		 concat(IFNULL(ccc.first_name,''),' ',IFNULL(ccc.last_name,'')) as s_name, 
+         ccc.company_name as s_company_name,
+         ccc.first_name as s_first_name, 
+		 ccc.last_name as s_last_name, 
+		 ccc.ID as s_ID, 
+		 ccc.primary_city as s_primary_city, 
+		 ccc.primary_email as s_primary_email,
+         ccc.primary_phone as s_primary_phone,
+		 ccc.primary_state as s_primary_state,		 
+		 
+		 q.shipping_customer_name,
+		 q.shipping_contact_id,
+		 q.shipping_address,
+		 q.shipping_phone,
+		 q.email_phone,
+		 q.shipping_city,
+		 q.shipping_zip,
+		 q.shipping_state,
+		 q.code,
+		 
+		 inv.ID as inv_id,
+		 inv.invoiceid as inv_name
+		 
+		 FROM  quote as o
+         LEFT Join contact as c ON o.bill_to = c.ID
+        left JOIN salesman as s ON s.SID =o.salesperson
+        Left Join contact as ccc ON s.UID = ccc.ID
+		left join quote_temp as q on q.quote_temp_id = o.quote_temp_id
+		left join invoice as inv on inv.order_id = o.order_id 
+		
+	-------------------report_orders -> report_quote
+	drop view `report_quote`;
+	CREATE  VIEW `report_quote`  AS  select `o`.`order_id` AS `order_id`,`o`.`order_title` AS `order_title`,`o`.`balance` AS `balance`,
+	`o`.`createTime` AS `createTime`,`o`.`updateTime` AS `updateTime`,`o`.`payment` AS `payment`,`o`.`total` AS `total`,
+	`o`.`warranty` AS `warranty`,
+	`o`.`bill_to`,`o`.`salesperson`,
+	`o`.`products_ordered`,o.order_create_by,
+	o.paid_in_full,
+	 o.order_releases,
+		 o.order_doors,
+	concat(IFNULL(`c`.`first_name`,''),' ',IFNULL(`c`.`last_name`,'')) AS `b_name`,
+	`c`.`ID` AS `b_ID`,
+	`c`.`primary_city` AS `b_primary_city`,
+	`c`.`primary_email` AS `b_primary_email`,
+	`c`.`primary_phone` AS `b_primary_phone`,
+	`c`.`primary_state` AS `b_primary_state`,
+	`c`.`first_name` AS `b_first_name`,
+	`c`.`last_name` AS `b_last_name`,
+	`c`.`primary_street_address1` AS `b_primary_street_address1`,
+	`c`.`primary_postal_code` AS `b_primary_postal_code`,	
+	
+	`cccc`.`ID` AS `submitter_ID`,
+	`cccc`.`primary_city` AS `submitter_primary_city`,
+	`cccc`.`primary_email` AS `submitter_primary_email`,
+	`cccc`.`primary_phone` AS `submitter_primary_phone`,
+	`cccc`.`primary_state` AS `submitter_primary_state`,
+	`cccc`.`first_name` AS `submitter_first_name`,
+	`cccc`.`last_name` AS `submitter_last_name`,
+	`cccc`.`primary_street_address1` AS `submitter_primary_street_address1`,
+	`cccc`.`primary_postal_code` AS `submitter_primary_postal_code`,
+	
+	concat(IFNULL(`ccc`.`first_name`,''),' ',IFNULL(`ccc`.`last_name`,'')) AS `s_name`,
+	`ccc`.`ID` AS `s_ID`,`ccc`.`primary_city` AS `s_primary_city`,`ccc`.`primary_email` AS `s_primary_email`,
+	`ccc`.`primary_phone` AS `s_primary_phone`,`ccc`.`primary_state` AS `s_primary_state`,
+	
+	
+	
+	TRIM( concat(IFNULL(TRIM(cccc.first_name), ''),
+					IF (cccc.middle_name IS NOT NULL AND  cccc.middle_name != '' ,
+                   concat(' ',TRIM(cccc.middle_name)),''),
+				   IF (cccc.last_name IS NOT NULL AND  cccc.last_name!= '' ,
+                   concat(' ',TRIM(cccc.last_name)),'')				   
+				   
+				 ))
+   AS create_by_name
+	 	 
+	 from `quote` `o`
+	 left join `contact` `c` on `o`.`bill_to` = `c`.`ID`
+	 left join `salesman` `sl` on `o`.`salesperson` = `sl`.`SID`
+	 left join `contact` `ccc` on `sl`.`UID` = `ccc`.`ID`
+	 left join `contact` `cccc` on `o`.`order_create_by` = `cccc`.`ID`;
+	 
+	  ------------------------------report_invoice ---------------------------------
+	 drop view `report_invoice`;
+	 CREATE VIEW `report_invoice`  AS  select 
+	 `i`.`ID` AS `ID`,`i`.`balance` AS `balance`,`i`.`customer` AS `customer`,
+	 `i`.`invoiceid` AS `invoiceid`,`i`.`order_id` AS `order_id`,
+	 `i`.`payment` AS `payment`,`i`.`salesperson` AS `salesperson`,
+	 `i`.`total` AS `total`,`i`.`createTime` AS `createTime`,`i`.`updateTime` AS `updateTime`,
+	 concat(`c`.`first_name`,' ',`c`.`last_name`) AS `customer_name`,
+	 concat(`ccc`.`first_name`,' ',`ccc`.`last_name`) AS `sale_name`,
+     o.order_title,
+	 o.paid_in_full
+	 
+	 from ((
+	 (`invoice` `i` join `contact` `c` on((`i`.`customer` = `c`.`ID`))) 
+	 join `salesman` `s` on((`i`.`salesperson` = `s`.`SID`))) 
+	 left join `contact` `ccc` on((`s`.`UID` = `ccc`.`ID`))) 
+	 left join `quote` `o` on `o`.`order_id` = `i`.`order_id` ;
+	 
+	 ----------------------------------report_pay_acc--------------
+	 drop view `report_pay_acc`;
+CREATE 
+VIEW `report_pay_acc`  AS  
+select `p`.`pay_id` AS `pay_id`,
+`p`.`pay_amount` AS `pay_amount`,
+`p`.`pay_type` AS `pay_type`,
+`p`.`pay_note` AS `pay_note`,
+`p`.`pay_tran_id` AS `pay_tran_id`,
+`p`.`pay_date` AS `pay_date`,
+`p`.`submit_by` AS `submit_by`,
+`p`.`approved` AS `approved`,
+`p`.`order_id` AS `order_id`,
+`p`.`invoice_id` AS `invoice_id`,
+`p`.`overage` AS `overage`,
+`p`.`customer` AS `customer`,
+`o`.`order_title` ,
+i.invoiceid AS invoice_number,
+
+trim(concat(ifnull(trim(`c`.`first_name`),''),if(((`c`.`middle_name` is not null) and (`c`.`middle_name` <> '')),concat(' ',trim(`c`.`middle_name`)),''),if(((`c`.`last_name` is not null) and (`c`.`last_name` <> '')),concat(' ',trim(`c`.`last_name`)),''))) AS `bill_to_name` ,
+trim(concat(ifnull(trim(`c`.`first_name`),''),if(((`c`.`middle_name` is not null) and (`c`.`middle_name` <> '')),concat(' ',trim(`c`.`middle_name`)),''),if(((`c`.`last_name` is not null) and (`c`.`last_name` <> '')),concat(' ',trim(`c`.`last_name`)),''))) AS `customer_name` ,
+trim(concat(ifnull(trim(`c1`.`first_name`),''),if(((`c1`.`middle_name` is not null) and (`c1`.`middle_name` <> '')),concat(' ',trim(`c1`.`middle_name`)),''),if(((`c1`.`last_name` is not null) and (`c1`.`last_name` <> '')),concat(' ',trim(`c1`.`last_name`)),''))) AS `submitter_name` 
+
+from `pay_acct` `p` 
+left join `contact` `c` on `c`.`ID` = `p`.`customer` 
+left join `contact` `c1` on `c1`.`ID` = `p`.`submit_by` 
+left join `invoice` `i` on `i`.`ID` = `p`.`invoice_id` 
+left join `quote` `o` on `o`.`order_id` = `p`.`order_id` 
+
+-------------------------
+---------------------------assign_task_short--------------------------	
+DROP VIEW 	assign_task_short;	
+Create view assign_task_short AS 			  
+select a.*,
+  q.order_title,	
+  q.sku_list,  
+  q.createTime as order_date,
+  concat(IFNULL(c.first_name,''),' ',IFNULL(c.last_name,'')) as assign_name,	
+  concat(IFNULL(cus.first_name,''),' ',IFNULL(cus.last_name,'')) as cus_name,
+  concat(IFNULL(b_to.first_name,''),' ',IFNULL(b_to.last_name,'')) as bill_to_name,
+  quote_temp.email_phone as shipping_email,
+  quote_temp.shipping_phone,
+  quote_temp.shipping_address,
+  
+  calendar.calendar_id
+  
+  from `assign_task` as a
+                LEFT join contact as c on c.ID = a.assign_id
+                LEFT join contact as cus on cus.ID =a.customer_id
+				LEFT join quote as q on q.order_id = a.assign_order
+				LEFT join  quote_temp on quote_temp.quote_temp_id = q.quote_temp_id
+				LEFT join contact as b_to on b_to.ID =q.bill_to
+				LEFT join calendar  on calendar.task_id  =a.id
+				
+				 ----------------------------pay_acc_short  new
+  drop view pay_acc_short;
+CREATE 
+VIEW `pay_acc_short`  AS  
+select `p`.`pay_id` AS `pay_id`,
+`p`.`pay_amount` AS `pay_amount`,
+`p`.`pay_type` AS `pay_type`,
+`p`.`pay_note` AS `pay_note`,
+`p`.`pay_tran_id` AS `pay_tran_id`,
+`p`.`pay_date` AS `pay_date`,
+`p`.`submit_by` AS `submit_by`,
+`p`.`approved` AS `approved`,
+`p`.`order_id`,
+`p`.`invoice_id` AS `invoice_id`,
+`p`.`customer` AS `customer`,
+`q`.contract_overage AS overage,
+i.invoiceid AS invoice_number,
+trim(concat(ifnull(trim(`c`.`first_name`),''),if(((`c`.`middle_name` is not null) and (`c`.`middle_name` <> '')),concat(' ',trim(`c`.`middle_name`)),''),if(((`c`.`last_name` is not null) and (`c`.`last_name` <> '')),concat(' ',trim(`c`.`last_name`)),''))) AS `bill_to_name` ,
+trim(concat(ifnull(trim(`c`.`first_name`),''),if(((`c`.`middle_name` is not null) and (`c`.`middle_name` <> '')),concat(' ',trim(`c`.`middle_name`)),''),if(((`c`.`last_name` is not null) and (`c`.`last_name` <> '')),concat(' ',trim(`c`.`last_name`)),''))) AS `customer_name` ,
+trim(concat(ifnull(trim(`c1`.`first_name`),''),if(((`c1`.`middle_name` is not null) and (`c1`.`middle_name` <> '')),concat(' ',trim(`c1`.`middle_name`)),''),if(((`c1`.`last_name` is not null) and (`c1`.`last_name` <> '')),concat(' ',trim(`c1`.`last_name`)),''))) AS `submitter_name` 
+
+from `pay_acct` as `p` 
+left join `contact` as `c` on `c`.`ID` = `p`.`customer` 
+left join `contact`  as `c1` on `c1`.`ID` = `p`.`submit_by` 
+left join `invoice` as `i` on `i`.`ID` = `p`.`invoice_id` 
+left join `quote` as `q` on `q`.`order_id` = `p`.`order_id`;
+
+---------------------------contact_detail-------------------------- 	
+DROP VIEW contact_detail;
+CREATE VIEW contact_detail AS 
+SELECT c.company_name, c.contact_inactive,c.contact_notes,c.contact_tags,
+        c.first_name,c.ID,c.last_name,c.middle_name,c.primary_city,
+        c.primary_email,c.primary_phone,c.primary_phone_ext,c.primary_phone_type,
+        c.primary_postal_code,c.primary_state,c.primary_street_address1,c.primary_street_address2,
+        c.primary_website,c.contact_type,
+		concat(c.first_name," ",c.last_name) as contact_name,
+		c.gps,
+		c.license_exp,c.w9_exp,c.insurrance_exp,
+		c.sms_api_key,
+		c.sms_api_username , 
+		c.contact_salesman_id,
+		
+        sb.submit_by as submit_by_id,
+        cr.create_by as create_by_id,
+        concat(IFNULL(sb.first_name,''),' ',IFNULL(sb.last_name,'')) as submit_by,
+        concat(IFNULL(cr.first_name,''),' ',IFNULL(cr.last_name,'')) as create_by,
+        u.userActive,u.userContactID,u.userID,u.user_name, 
+        aff.active,aff.aff_type,aff.AID,aff.UID,
+        com.ID as com_ID, com.name,
+		vt.V_type,vt.active as V_active,
+		slman.area,
+		
+		et.active as emp_active,et.e_type ,et.EID ,et.UID as emp_UID,
+		driver_rate,driver_avatar,driver_min_rate
+		
+        FROM  contact as c
+        left Join contact as sb ON c.submit_by = sb.ID
+        left Join contact as cr ON c.create_by = cr.ID
+        left Join affiliate as aff ON aff.UID = c.ID
+        left Join users as u ON u.userContactID = c.ID
+        left Join company as com ON com.ID = c.company_name		
+		left Join vendor_type as vt ON vt.UID = c.ID
+		left Join salesman as slman ON slman.UID = c.ID
+	   left join employee_type as et on et.UID = c.ID
+	   left join driver on driver.contact_id  = c.ID
+	   
+	   	  ------------------------------driver_short ---------------------------------
+	 drop view `driver_short`;
+	 CREATE VIEW `driver_short`  AS  select 
+	 driver.*,
+	 trim(concat(ifnull(trim(`c`.`first_name`),''),
+	 if(((`c`.`middle_name` is not null) and (`c`.`middle_name` <> '')),concat(' ',trim(`c`.`middle_name`)),''),
+	 if(((`c`.`last_name` is not null) and (`c`.`last_name` <> '')),concat(' ',trim(`c`.`last_name`)),''))) AS `driver_name` ,
+	 `c`.`primary_email` as driver_email,
+	 `c`.`primary_phone` as driver_phone,
+	 `c`.`primary_street_address1` as driver_addr
+	 
+	 from driver
+	 left Join contact as c ON c.ID = driver.contact_id
+	 
+	 ----------------------------------contact_short
+	 drop view contact_short;
+  CREATE VIEW `contact_short`  AS  select c.ID,c.first_name,c.last_name,c.primary_email,
+	c.primary_phone,c.primary_city,c.primary_state,c.primary_postal_code,c.contact_inactive,
+	c.create_date, c.contact_type, com.name as company_name,c.create_by,c.contact_tags,
+	        concat(IFNULL(c.first_name, '')," ",IFNULL(c.last_name, ''),
+				IF ( c.primary_city IS NOT NULL AND  c.primary_city != '' ,
+                   concat('-',c.primary_city),''
+                   ),
+				IF ( c.primary_state IS NOT NULL AND  c.primary_state!= '' ,
+                   concat('-',c.primary_state),''
+                   )
+				)AS c_name,
+				   
+			concat(IFNULL(c.first_name, '')," ",IFNULL(c.last_name, ''),
+			    IF ( com.name IS NOT NULL AND  com.name != '' ,
+                   concat('-',com.name),''
+                   ),
+					IF ( c.primary_city IS NOT NULL AND  c.primary_city != '' ,
+                   concat('-',c.primary_city),''
+                   ),
+				   IF (c.primary_state IS NOT NULL AND  c.primary_state!= '' ,
+                   concat('-',c.primary_state),''
+                   )				   
+				   
+				 )AS c_name_company,
+   TRIM(concat(IFNULL(TRIM(c.first_name), '')," ",IFNULL(TRIM(c.last_name), ''))) AS contact_name,
+   TRIM( concat(IFNULL(TRIM(c.first_name), ''),
+					IF (c.middle_name IS NOT NULL AND  c.middle_name != '' ,
+                   concat(' ',TRIM(c.middle_name)),''),
+				   IF (c.last_name IS NOT NULL AND  c.last_name!= '' ,
+                   concat(' ',TRIM(c.last_name)),'')
+				   
+				 ))
+   AS f_m_lname,
+   c.primary_street_address1,
+   c.primary_street_address2,
+   TRIM( concat(IFNULL(TRIM(c.primary_street_address1), ''),
+					IF (c.primary_city IS NOT NULL AND  c.primary_city != '' ,
+                   concat(', ',TRIM(c.primary_city)),''),
+				   IF (c.primary_state IS NOT NULL AND  c.primary_state!= '' ,
+                   concat(', ',TRIM(c.primary_state)),'')				   
+				 ))
+   AS address,
+   c.license_exp,c.w9_exp,c.insurrance_exp,
+   com.fax
+ 
+ from `contact` as c
+ left join company as com on com.ID=c.company_name 
+ 
+ 	---------------------------quote_short_report --------------------------	
+
+DROP VIEW quote_short_report;
+	
+CREATE VIEW quote_short_report AS 
+
+SELECT   `o`.`discount_code`,o.order_id, o.products_ordered, o.balance, 
+o.bill_to, o.createTime,
+         o.note, o.payment, o.salesperson,
+		 o.salesperson_amount,
+		 o.warranty,o.order_title,
+         o.	total, c.company_name as b_company_name,
+		 o.subscription,
+		 o.order_create_by,
+		 o.contract_overage,o.grand_total,		 
+		 o.order_status,
+		 o.available_container_amount,
+		 o.sku_list,
+		 o.order_sku,
+		 o.quote_temp_id,
+		 o.order_releases,
+		 o.order_doors,
+		 concat(IFNULL(c.first_name,''),IFNULL(c.middle_name,''),' ',IFNULL(c.last_name,'')) as b_name,
+         c.first_name as b_first_name, 
+		 c.last_name as b_last_name, 
+		 c.ID as b_ID, 
+		 c.primary_city as b_primary_city, c.primary_email as b_primary_email,
+         c.primary_phone as b_primary_phone,c.primary_state as b_primary_state,
+		 c.primary_street_address1 as b_address1, 
+		 concat(IFNULL(ccc.first_name,''),' ',IFNULL(ccc.last_name,'')) as s_name, 
+         ccc.company_name as s_company_name,
+         ccc.first_name as s_first_name, 
+		 ccc.last_name as s_last_name, 
+		 ccc.ID as s_ID, 
+		 ccc.primary_city as s_primary_city, 
+		 ccc.primary_email as s_primary_email,
+         ccc.primary_phone as s_primary_phone,
+		 ccc.primary_state as s_primary_state,	
+		 ccc.primary_street_address1 as s_primary_address1,		 
+		 
+		 q.shipping_customer_name,
+		 q.shipping_contact_id,
+		 q.shipping_address,
+		 q.shipping_phone,
+		 q.email_phone as shipping_email_phone,
+		 q.shipping_city,
+		 q.shipping_zip,
+		 q.shipping_state,
+		 
+		 inv.ID as inv_id,
+		 inv.invoiceid as inv_name,
+		 
+		 quote_data_temp.depot_id   as quote_temp_depot_id,
+		 quote_data_temp.depot_name   as quote_temp_depot_name,
+		 quote_data_temp.best_price   as quote_temp_best_price,
+		 quote_data_temp.container_type_id   as quote_temp_container_type_id,
+		 quote_data_temp.container_rate   as quote_temp_container_rate,
+		 quote_data_temp.container_type_name   as quote_temp_container_type_name,
+		 quote_data_temp.depot_address   as quote_temp_depot_address,
+		 quote_data_temp.rate_mile   as quote_temp_rate_mile,
+		 quote_data_temp.qty   as quote_temp_qty,
+		 quote_data_temp.create_date   as quote_temp_create_date,
+		 quote_data_temp.vendor_id   as quote_temp_vendor_id,
+		 quote_data_temp.prod_SKU   as quote_temp_prod_SKU,
+		 quote_data_temp.prod_id   as quote_temp_prod_id,
+		 quote_data_temp.prod_name   as quote_temp_prod_name,
+		 quote_data_temp.distance   as quote_temp_distance,
+		 
+		 assign_task.id  as assign_task_id ,
+		 assign_task.taskName as assign_task_taskName ,		 
+		 assign_task.status as assign_task_status ,
+		 assign_task.content as assign_task_content ,
+		 assign_task.delivery_date as assign_task_delivery_date ,
+		 assign_task.driver_total as assign_task_driver_total ,
+		 assign_task.product_sku as assign_task_product_sku,
+		 assign_task.assign_id as assign_task_driver_id ,
+		 concat(IFNULL(c_driver.first_name,''),IFNULL(c_driver.middle_name,''),' ',IFNULL(c_driver.last_name,'')) 
+			as assign_task_driver_name,	
+		 c_driver.primary_city as driver_primary_city, 
+		 c_driver.primary_email as driver_primary_email,
+         c_driver.primary_phone as driver_primary_phone,
+		 c_driver.primary_state as driver_primary_state,	
+		 c_driver.primary_street_address1 as driver_primary_address1,				
+		 
+		 rate_container.container_cost,
+		 depots.depot_phone
+		 
+		 FROM  quote as o
+         LEFT Join contact as c ON o.bill_to = c.ID
+        left JOIN salesman as s ON s.SID =o.salesperson
+        Left Join contact as ccc ON s.UID = ccc.ID
+		left join quote_temp as q on q.quote_temp_id = o.quote_temp_id
+		left join invoice as inv on inv.order_id = o.order_id 
+		left join quote_data_temp on quote_data_temp.quote_temp_id = o.quote_temp_id 
+		left join assign_task on assign_task.assign_order = o.order_id AND assign_task.product_sku = quote_data_temp.prod_SKU
+		left join contact as c_driver on c_driver.ID = assign_task.assign_id
+		
+		left join rate_container  on rate_container.container_sku = quote_data_temp.prod_SKU
+		INNER JOIN depots on depots.depot_id = quote_data_temp.depot_id
+		
+		//left join rate_shipping  on rate_shipping.vendor_id = quote_data_temp.vendor_id AND rate_shipping.depot_id = quote_data_temp.depot_id	 
+		//left join rate_container  on rate_container.vendor_id = quote_data_temp.vendor_id AND rate_container.depot_id = quote_data_temp.depot_id AND
+									//	rate_container.container_type_id = quote_data_temp.container_type_id	
+										
+										---------------------------driver_task_short--------------------------	
+DROP VIEW 	driver_task_short;	
+Create view driver_task_short AS 			  
+select t.*,
+  concat(IFNULL(c.first_name,''),' ',IFNULL(c.last_name,'')) as assign_name,
+  products.prod_name
+  
+  from `assign_task` as t
+                LEFT join contact as c on c.ID = t.assign_id
+				LEFT join products  on products.SKU  =t.product_sku
+---------------------------pay_for_driver_short--------------------------	
+DROP VIEW 	pay_for_driver_short;	
+Create view pay_for_driver_short AS 			  
+select dr_p.*,
+  concat(IFNULL(c.first_name,''),' ',IFNULL(c.last_name,'')) as assign_name,
+  assign_task.driver_total,
+  assign_task.taskName,
+  assign_task.product_sku,
+  assign_task.assign_order,
+  assign_task.assign_id as assign_driver,
+  assign_task.driver_name
+  
+  from `pay_for_driver` as dr_p
+                LEFT join contact as c on c.ID = dr_p.pay_driver
+				LEFT join assign_task  on assign_task.ID  =dr_p.pay_task
+				
+
+				
+				--------------------------products_short--------
+
+drop view products_short;
+CREATE VIEW products_short AS 
+SELECT DISTINCT products.*,
+rate_container.container_type_id,
+container_type.container_feet_type
+	
+from `products` 
+LEFT join rate_container  on rate_container.container_sku  = products.SKU
+LEFT join container_type  on container_type.container_type_id  = rate_container.container_type_id		
+where prod_inactive =0;
+
+
+				--------------------------pay_driver_group_task_short--------
+drop view pay_driver_group_task_short;
+CREATE VIEW pay_driver_group_task_short AS 
+select
+task_id,
+assign_order,
+driver_total,
+product_sku,
+taskName,
+assign_driver,
+driver_name,
+pay_task,
+ SUM(pay_amount) as total_paid
+
+from `paid_driver_task_short` 
+GROUP BY pay_task;
+
+------------------------paid_driver_task_short
+DROP VIEW 	paid_driver_task_short;	
+Create view paid_driver_task_short AS 			  
+select
+  assign_task.ID as task_id,
+  concat(IFNULL(c.first_name,''),' ',IFNULL(c.last_name,'')) as assign_name,
+  assign_task.driver_total,
+  assign_task.taskName,
+  assign_task.product_sku,
+  assign_task.assign_order,
+  assign_task.assign_id as assign_driver,
+  assign_task.driver_name,
+ 
+ dr_p.*
+  
+  from `assign_task`
+  LEFT join contact as c on c.ID = assign_task.assign_id
+  
+  LEFT join `pay_for_driver` as dr_p on dr_p.pay_task=assign_task.ID
+  
+  ---------------------paid_salesperson_short
+  drop view paid_salesperson_short;
+  CREATE VIEW `paid_salesperson_short`  AS  select p.*,
+  trim(concat(ifnull(trim(`c`.`first_name`),''),if(((`c`.`middle_name` is not null) and 
+  (`c`.`middle_name` <> '')),concat(' ',trim(`c`.`middle_name`)),''),if(((`c`.`last_name` is not null) and 
+  (`c`.`last_name` <> '')),concat(' ',trim(`c`.`last_name`)),''))) AS `s_name` ,
+  
+  trim(concat(ifnull(trim(`c1`.`first_name`),''),if(((`c1`.`middle_name` is not null) and 
+  (`c1`.`middle_name` <> '')),concat(' ',trim(`c1`.`middle_name`)),''),if(((`c1`.`last_name` is not null) and 
+  (`c1`.`last_name` <> '')),concat(' ',trim(`c1`.`last_name`)),''))) AS `submit_name`,
+  
+  q.salesperson_amount,
+  q.order_title
+			
+ from `pay_salesperson` as p
+ left join contact as c on c.ID=p.pay_salesperson 
+ left join contact as c1 on c1.ID=p.submit_by 
+ left join quote as q on q.order_id =p.pay_order 
